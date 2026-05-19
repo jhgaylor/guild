@@ -8,13 +8,14 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- g2-slice-plan — general-purpose-engineer (conv 418bf0ad-ef85-4e51-ba7e-5a0f54230d51)
+- g2-slice-1-scaffold — general-purpose-engineer (conv 14a2b5c8-9189-4440-b20c-604b297e3f16)
 
 ## Done
 
 - **phase-0-framing** — PR #1 merged. G0 resolved: Wedge B selected.
 - **g1-wedge-b-plan** — PR #2 merged (4d7cf34). Engineering plan locked.
 - **g1-adrs** — PR #4 merged (73e4155). ADRs 0005–0009 locked.
+- **g2-slice-plan** — PR #5 merged (b94d49d). G2 slice decomposition locked.
 
 ## Next
 
