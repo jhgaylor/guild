@@ -8,19 +8,22 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- g1-wedge-b-plan — general-purpose-engineer (conv df0d8c26-04fe-40fe-a175-63ce2a379d15)
+- g1-adrs — general-purpose-engineer (conv $FOUNTAIN_CONVERSATION_ID)
+
+## Done
+
+- **phase-0-framing** — PR #1 merged. G0 resolved: Wedge B selected.
+- **g1-wedge-b-plan** — PR #2 merged (4d7cf34). Engineering plan locked.
 
 ## Next
 
 _(empty)_
 
-## Done
-
-- **phase-0-framing** — merged PR #1 (2026-05-19). G0 resolved: Wedge B chosen (thread model + state machine first, claiming stubbed).
+- G1 gates when the ADR PR merges; G2 dispatch follows immediately after.
 
 ## Gated
 
 - **G0** — resolved. Wedge B selected.
-- **G1** — Wedge plan + ADRs locked (event ingestion path, thread linkage, state persistence, action primitive runtime, worker decision contract). Runtime ADR already locked: [`decisions/0002-elixir-phoenix-liveview.md`](decisions/0002-elixir-phoenix-liveview.md).
+- **G1** — plan locked (PR #2). ADRs 0005–0009 in flight (decisions/g1-adrs branch). Gates when ADR PR merges.
 - **G2** — First worker shippable end-to-end in a sandbox against a seeded issue.
 - **G3** — Self-hosting cutover: point the worker at live issues in this repo.
