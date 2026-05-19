@@ -23,5 +23,17 @@ spec:
           # the new digest. Swap to a pinned tag once releases land.
           image: ghcr.io/jhgaylor/guild:latest
           imagePullPolicy: Always
+          env:
+            # CNPG auto-generates the `guild-pg-app` Secret on Cluster
+            # bootstrap. `uri` is the postgres://user:pass@host:port/db
+            # URL that Ecto/Phoenix consume directly via DATABASE_URL.
+            # Nginx ignores it for now; wiring is in place so the
+            # Phoenix app starts reading a live database the moment its
+            # Dockerfile replaces this one.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: guild-pg-app
+                  key: uri
           ports:
             - containerPort: 80
