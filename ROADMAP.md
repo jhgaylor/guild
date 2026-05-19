@@ -2,6 +2,10 @@
 
 The captain-picard orchestrator reads this every cycle and writes the conversation id of each dispatched slice into "Now." Keep this file under one screen — if it grows, kill or defer something.
 
+## Orchestrator
+
+_(empty — operator records the active captain-picard `conv_id` here after the first `fountain run`. Subsequent sessions resume with `fountain conv prompt <id>` to preserve the orchestrator's working memory; starting a fresh `fountain run` loses it.)_
+
 ## Now
 
 _(empty — orchestrator fills this on dispatch, with `<slice> — <role> (conv <id>)` per entry.)_
