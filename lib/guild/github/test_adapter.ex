@@ -92,4 +92,21 @@ defmodule Guild.GitHub.TestAdapter do
   @impl Guild.GitHub
   def add_label(_repo, _issue_number, _labels),
     do: maybe_raise(get_response(:add_label))
+
+  @impl Guild.GitHub
+  def get_issue(_repo, issue_number) do
+    case get_response(:get_issue) do
+      {:ok, _} ->
+        {:ok,
+         %{
+           title: "Test Issue",
+           body: "Test body",
+           number: issue_number,
+           node_id: "node_#{issue_number}"
+         }}
+
+      other ->
+        maybe_raise(other)
+    end
+  end
 end

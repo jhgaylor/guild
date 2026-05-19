@@ -83,4 +83,6 @@ defmodule Guild.GitHub do
 
   @callback add_label(repo :: String.t(), issue_number :: integer(), labels :: list()) ::
               result()
+
+  @callback get_issue(repo :: String.t(), issue_number :: integer()) :: result()
 end
