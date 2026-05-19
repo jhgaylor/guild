@@ -257,4 +257,10 @@ defmodule Guild.GitHub.HttpAdapter do
   def add_label(repo, issue_number, labels) do
     github_request(:post, "/repos/#{repo}/issues/#{issue_number}/labels", %{labels: labels})
   end
+
+  @impl Guild.GitHub
+  def list_pull_requests(repo, opts) do
+    state = Keyword.get(opts, :state, "open")
+    github_request(:get, "/repos/#{repo}/pulls?state=#{state}", nil)
+  end
 end

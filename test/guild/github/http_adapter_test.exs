@@ -368,6 +368,29 @@ defmodule Guild.GitHub.HttpAdapterTest do
   end
 
   # ---------------------------------------------------------------------------
+  # list_pull_requests
+  # ---------------------------------------------------------------------------
+
+  describe "list_pull_requests/2" do
+    test "returns {:ok, list} on 200", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/repos/jhgaylor/guild/pulls", fn conn ->
+        json_resp(conn, 200, [%{"number" => 1, "html_url" => "https://github.com/jhgaylor/guild/pull/1"}])
+      end)
+
+      assert {:ok, [%{"number" => 1}]} = HttpAdapter.list_pull_requests("jhgaylor/guild", state: "open")
+    end
+
+    test "returns {:error, :transient, :server_error} on 500", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/repos/jhgaylor/guild/pulls", fn conn ->
+        json_resp(conn, 500, %{"message" => "Internal Server Error"})
+      end)
+
+      assert {:error, :transient, :server_error} =
+               HttpAdapter.list_pull_requests("jhgaylor/guild", state: "open")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # token exchange via Bypass (Fix 2: real auth flow, no persistent_term seed)
   # ---------------------------------------------------------------------------
 

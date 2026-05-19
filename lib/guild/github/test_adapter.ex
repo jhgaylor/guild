@@ -109,4 +109,8 @@ defmodule Guild.GitHub.TestAdapter do
         maybe_raise(other)
     end
   end
+
+  @impl Guild.GitHub
+  def list_pull_requests(_repo, _opts),
+    do: maybe_raise(get_response(:list_pull_requests))
 end

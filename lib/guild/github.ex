@@ -85,4 +85,9 @@ defmodule Guild.GitHub do
               result()
 
   @callback get_issue(repo :: String.t(), issue_number :: integer()) :: result()
+
+  @callback list_pull_requests(repo :: String.t(), opts :: keyword()) :: result()
+
+  @doc "Returns the configured GitHub adapter module."
+  def impl, do: Application.get_env(:guild, :github_adapter, Guild.GitHub.TestAdapter)
 end
