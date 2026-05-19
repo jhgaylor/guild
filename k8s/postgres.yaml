@@ -1,0 +1,39 @@
+# Postgres backend for guild. CNPG auto-generates Secret `guild-pg-app`
+# with `host`, `port`, `username`, `password`, `dbname`, `uri` keys —
+# the app Deployment consumes them via secretKeyRef.
+#
+# `standard` image variant pins postgres 17 with pgvector preinstalled.
+# Guild may not need vector search today, but Elixir + LLM-adjacent
+# workers often grow into embeddings; standard is the lower-regret call
+# vs minimal. mem0 made the same choice.
+#
+# Single instance — Longhorn replicates the volume across nodes, which
+# is enough durability for a personal cluster. Bump `instances` to 3
+# only if Postgres-level HA matters more than the storage cost.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: guild-pg
+  namespace: guild
+spec:
+  instances: 1
+
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.6-standard-trixie
+
+  bootstrap:
+    initdb:
+      database: guild_app
+      owner: guild
+      postInitTemplateSQL:
+        - CREATE EXTENSION IF NOT EXISTS vector;
+
+  storage:
+    storageClass: longhorn
+    size: 5Gi
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
