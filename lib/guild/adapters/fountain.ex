@@ -18,9 +18,11 @@ defmodule Guild.Adapters.Fountain do
   end
 
   defp token do
-    Application.get_env(:guild, :fountain_token) ||
+    Application.get_env(:guild, :fountain_api_key) ||
+      Application.get_env(:guild, :fountain_token) ||
+      System.get_env("FOUNTAIN_API_KEY") ||
       System.get_env("FOUNTAIN_TOKEN") ||
-      raise "FOUNTAIN_TOKEN not configured"
+      raise "FOUNTAIN_API_KEY not configured"
   end
 
   defp auth_headers do

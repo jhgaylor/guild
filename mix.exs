@@ -55,6 +55,8 @@ defmodule Guild.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:httpoison, "~> 2.0"},
+      {:joken, "~> 2.6"},
+      {:jose, "~> 1.11"},
       {:bypass, "~> 2.1", only: :test}
     ]
   end

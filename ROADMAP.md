@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- g2-slice-4 — general-purpose-engineer (conv 4f76af23-581d-4891-9c3a-5186ef4d6d27)
+- g2-slice-5 — general-purpose-engineer (conv $FOUNTAIN_CONVERSATION_ID)
 
 ## Done
 
@@ -19,6 +19,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 - **g2-slice-1** — PR #6 merged (404d8ee). Phoenix scaffold + Ecto + all five schemas.
 - **g2-slice-2** — PR #7 merged (ac885d64). State machine + context assembly + worker contracts.
 - g2-slice-3 — PR #8 merged (5bcbdb02)
+- g2-slice-4 — PRs #9+#10 merged (da3f05a/9da21e3). Fountain env+agent registered.
 
 ## Next
 

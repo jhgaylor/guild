@@ -22,6 +22,20 @@ end
 
 config :guild, GuildWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# Wire real GitHub adapter in non-test environments.
+# Credentials (GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_INSTALLATION_ID) are
+# read at call time by Guild.GitHub.HttpAdapter via System.get_env/1.
+if config_env() != :test do
+  config :guild, :github_adapter, Guild.GitHub.HttpAdapter
+end
+
+# Fountain + Guild implementer agent config
+config :guild,
+  fountain_base_url: System.get_env("FOUNTAIN_BASE_URL"),
+  fountain_api_key: System.get_env("FOUNTAIN_API_KEY"),
+  guild_implementer_agent_id:
+    System.get_env("GUILD_IMPLEMENTER_AGENT_ID", "5442009b-5b31-4b2d-9868-fb6d1267b6c1")
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||
