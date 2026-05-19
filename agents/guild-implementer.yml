@@ -5,9 +5,7 @@ metadata:
 spec:
   runtime: claude
   model: anthropic/claude-opus-4-7
-  # TODO(slice-5-prep): resolve environment name — this worker needs Elixir + mix +
-  # Postgres + GitHub credentials. Operator to supply env name before E2E run.
-  environment: <TBD-env-name>
+  environment: guild-worker
   system: |
     You are Guild's implementation worker. You will receive a GitHub issue to implement.
 
