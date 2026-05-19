@@ -47,7 +47,12 @@ if config_env() == :prod do
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
   config :guild, Guild.Repo,
-    # ssl: true,
+    # In-cluster CNPG connection. Postgrex 0.22+ negotiates SSL by default
+    # and the server's CA isn't in the runtime image, so an explicit
+    # `ssl: false` keeps the pod from failing at "TLS Unknown CA" during
+    # boot migrations. Acceptable for pod-to-pod traffic inside the
+    # cluster; revisit when crossing trust boundaries.
+    ssl: false,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
     # For machines with several cores, consider starting multiple pools of `pool_size`
