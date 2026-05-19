@@ -8,12 +8,13 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- g1-adrs — general-purpose-engineer (conv cd480714-29b0-46cc-821e-1d6331c366c7)
+- g2-slice-plan — general-purpose-engineer (conv 418bf0ad-ef85-4e51-ba7e-5a0f54230d51)
 
 ## Done
 
 - **phase-0-framing** — PR #1 merged. G0 resolved: Wedge B selected.
 - **g1-wedge-b-plan** — PR #2 merged (4d7cf34). Engineering plan locked.
+- **g1-adrs** — PR #4 merged (73e4155). ADRs 0005–0009 locked.
 
 ## Next
 
@@ -24,6 +25,6 @@ _(empty)_
 ## Gated
 
 - **G0** — resolved. Wedge B selected.
-- **G1** — plan locked (PR #2). ADRs 0005–0009 in flight (decisions/g1-adrs branch). Gates when ADR PR merges.
+- **G1** — CLOSED. ADRs 0005–0009 merged (PR #4, 73e4155).
 - **G2** — First worker shippable end-to-end in a sandbox against a seeded issue.
 - **G3** — Self-hosting cutover: point the worker at live issues in this repo.
