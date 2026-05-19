@@ -73,12 +73,15 @@ defmodule Mix.Tasks.Guild.ClaimSeed do
       end
     end
 
-    # Step 5: Assign to self
+    # Step 5: Assign to self (best-effort). GitHub doesn't accept Apps as
+    # issue assignees — the App identity (e.g. "guild-bot") returns 422
+    # unless it's also a real user with repo read access. The thread
+    # state and the "Taking this" comment carry the load-bearing signal;
+    # the assignment is a nice-to-have presence cue. Log and continue.
     case WorkManagement.assign_to_self(repo, issue_number) do
       {:ok, _} -> :ok
       {:error, _, reason} ->
-        Mix.shell().error("Failed to assign to self: #{inspect(reason)}")
-        exit({:shutdown, 1})
+        Mix.shell().info("assign_to_self skipped: #{inspect(reason)}")
     end
 
     # Step 6: Comment on issue
