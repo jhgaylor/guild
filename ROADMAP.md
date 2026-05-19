@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- g1-adrs — general-purpose-engineer (conv $FOUNTAIN_CONVERSATION_ID)
+- g1-adrs — general-purpose-engineer (conv cd480714-29b0-46cc-821e-1d6331c366c7)
 
 ## Done
 
