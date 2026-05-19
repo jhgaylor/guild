@@ -72,6 +72,15 @@ defmodule Guild.GitHub.HttpAdapterTest do
 
       assert {:error, :permanent, :forbidden} = HttpAdapter.get_issue("jhgaylor/guild", 3)
     end
+
+    test "returns {:error, :unexpected, {:unknown_status, 418}} on 418", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/repos/jhgaylor/guild/issues/3", fn conn ->
+        json_resp(conn, 418, %{"message" => "I'm a teapot"})
+      end)
+
+      assert {:error, :unexpected, {:unknown_status, 418}} =
+               HttpAdapter.get_issue("jhgaylor/guild", 3)
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -355,6 +364,80 @@ defmodule Guild.GitHub.HttpAdapterTest do
 
       assert {:error, :permanent, :not_found} =
                HttpAdapter.add_label("jhgaylor/guild", 3, ["bug"])
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # token exchange via Bypass (Fix 2: real auth flow, no persistent_term seed)
+  # ---------------------------------------------------------------------------
+
+  @test_rsa_key """
+  -----BEGIN PRIVATE KEY-----
+  MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCsLE8uRNmFLiAw
+  RslTXzSKW7ZK8DeYlHm5FNlxcNyRRSfXdD7MBleShv4vNAgdw+lxLMqfwXedCQ7i
+  6MDoc9nsQb+KeuHZgVoIetl3JnZJYr029EfhbeqXivqXdCeEisWxgSyei9lzpmob
+  ovMk0xwl2likIUGl4yomY6VSlrT5s/d5NmO0HKxjk4Sn5K/wx9ltlvn+J5kkbQNu
+  BSYJRx2uOJgFNl2RODcbns2wZVI+6jYBZLTJJg2WJdZ02XokrnRe5JT5BB/YgrlX
+  fcAPncRH+vpuRyIDtWAg01+ACe4xjDX7JzUzTUH+bprap7yrz48C8mE51QvmHPIq
+  QwAq7yJRAgMBAAECggEAChVvmcJ3NEFMVKeArmewDb5rVx4/Pf921ZaEBGHbeTf3
+  VRC+MM2E9CmrL3E5ByKXRIVJZME8U9qDoFneGn8r2et2irzBsi8iP8bk1QFQAjeh
+  5LBlRAMKWfp4zMVadH0lhkzjeRxbDavxy6aSiQCYRcXw/8PhiBQIPvFXwxYyiUFJ
+  Vn1pKSUbIT4u8KDblFU+YRvN5S6DntFUo/2o8Dc4V5SRNiNoTpg2c/HnIcUa1hRj
+  YnCnFo3fIbIkmtZLS/AHXe9Dbpet4uase+e+fAQo4djh6U0P6abc2N13jse08dJs
+  yDuBWmXhqT1XxMm8trPO4SfM2evKxPGg3caOcSe+8QKBgQDp6AoEqJVasusM1dN3
+  dP0pNoQv/xaCvIYcxnvn1LUej4/FcLbcApS6jSTYbww/r/jZGesD9lvB8W3OEzfS
+  bzDQo6FSdywjUmijyzYXP3JxPHqbzSCJVRa+nFDn8HnFa0E1YnalncEhzjIiDoai
+  a//p3NuqIGKBgqiqQFbTt68xxQKBgQC8b4fyBv9raUuMgj8BIr4f0V9gqaWWX2Py
+  anej25Z48QYCntx+mac35N4ySAYhIVMhRH2zog+GNXPId1B0lRl29X2Mrq2O7S0L
+  ZNNLRwW2/7v3mEKBYUSJTZNyOxvcSK40giv/ZQtEEAWgEoaw4qWh7XaZ0P7MxKt+
+  zK6CmH9zHQKBgQCvN2/Rv4tqDt7+lWq8cHl4Fut8nMR7GMgJ5DFLH86xXu9fAqko
+  NBK/kB2Kt9zgFG0ADGc9Z52isb0EgubtDvftQrYE9Vqt9vyFviL91TxgUOKztTxr
+  Q78u+B+vLze4yDhnyiOAuqTDMxfg5Sq7ntVslVJDpdDEnWDFcD7aiB2H1QKBgH9i
+  pnRnZqQmOnxyUEVkR0MbN28RQG+3bMmkT9zlxYNc7MM4wbaUCQcwIUW8iug6rwf+
+  VTvqgrQnzm3muu0VHnHc41MHgyzsCVd6gZySFrrvhxKKS+tK5hor51GBxAPW3m2A
+  0l2E4WjRq/vailNp5K7i6Rpyvs2O5qCBnjeLAB3BAoGAJKGUcZ0o0eI0sBLMImNf
+  EMczwWUoiQdk4lYtmhY8/Ue6sgpr0xuotXH4B2ol5XU25Q0I5EpxhNpd5NCJTijY
+  EC3suidBfj6ZKMGj90TmA8U+atR06uEU5IUf2c3+r2WtCxIKXOP19RwwrtubsSux
+  /d+bMh5BlXI1Ez/pj2RkkgI=
+  -----END PRIVATE KEY-----
+  """
+
+  describe "token exchange via Bypass" do
+    setup %{bypass: bypass} do
+      # Override outer setup: remove pre-seeded token so the real exchange runs
+      :persistent_term.erase({HttpAdapter, :token})
+
+      System.put_env("GITHUB_APP_ID", "12345")
+      System.put_env("GITHUB_PRIVATE_KEY", String.trim(@test_rsa_key))
+      System.put_env("GITHUB_INSTALLATION_ID", "99999")
+
+      Bypass.expect_once(bypass, "POST", "/app/installations/99999/access_tokens", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(
+          201,
+          Jason.encode!(%{
+            "token" => "bypass-test-token",
+            "expires_at" => "2099-12-31T23:59:59Z"
+          })
+        )
+      end)
+
+      on_exit(fn ->
+        System.delete_env("GITHUB_APP_ID")
+        System.delete_env("GITHUB_PRIVATE_KEY")
+        System.delete_env("GITHUB_INSTALLATION_ID")
+      end)
+
+      :ok
+    end
+
+    test "fetches installation token and uses it for subsequent calls", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/repos/jhgaylor/guild/issues/1", fn conn ->
+        json_resp(conn, 200, %{"number" => 1})
+      end)
+
+      assert {:ok, %{"number" => 1}} = HttpAdapter.get_issue("jhgaylor/guild", 1)
     end
   end
 

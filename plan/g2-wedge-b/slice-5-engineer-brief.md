@@ -27,5 +27,4 @@ Fountain agent registered: guild-implementer (5442009b-5b31-4b2d-9868-fb6d1267b6
   GUILD_IMPLEMENTER_AGENT_ID
 
 ## Out of scope
-- Do NOT run mix test --include e2e (operator runs post-merge with prod .env)
-- No LiveView controllers or UI changes
+- Do NOT run mix test --include e2e (operator runs post-merge with prod .env); no LiveView/UI changes

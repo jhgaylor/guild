@@ -29,8 +29,9 @@ defmodule Guild.GitHub.HttpAdapter do
   end
 
   defp get_installation_token do
+    now = System.system_time(:second)
     case :persistent_term.get({__MODULE__, :token}, nil) do
-      {token, expiry} when expiry > System.system_time(:second) + 60 ->
+      {token, expiry} when expiry > now + 60 ->
         token
 
       _ ->
