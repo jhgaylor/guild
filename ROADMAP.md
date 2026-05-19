@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- g2-slice-5 — general-purpose-engineer (conv $FOUNTAIN_CONVERSATION_ID)
+_(empty — G2 closed; next is G3 deliberation)_
 
 ## Done
 
@@ -17,19 +17,20 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 - **g1-adrs** — PR #4 merged (73e4155). ADRs 0005–0009 locked.
 - **g2-slice-plan** — PR #5 merged (b94d49d). G2 slice decomposition locked.
 - **g2-slice-1** — PR #6 merged (404d8ee). Phoenix scaffold + Ecto + all five schemas.
-- **g2-slice-2** — PR #7 merged (ac885d64). State machine + context assembly + worker contracts.
-- g2-slice-3 — PR #8 merged (5bcbdb02)
-- g2-slice-4 — PRs #9+#10 merged (da3f05a/9da21e3). Fountain env+agent registered.
+- **g2-slice-2** — PR #7 merged (ac885d6). State machine + context assembly + worker contracts.
+- **g2-slice-3** — PR #8 merged (5bcbdb0). Action primitives + Fountain adapter.
+- **g2-slice-4** — PRs #9+#10 merged (da3f05a/9da21e3). ClaimSeed + implementer agent registered.
+- **g2-slice-5** — PRs #11+#13 merged (88da670/ab6f576). HttpAdapter + E2E test with reconciliation.
+- **g2-infra** — PR #12 merged (6be8635) + fixes 220a719/79b979c/64cbf43/8ad297b. Phoenix release Dockerfile + k8s wiring + SSL/assign/timeout patches.
+- **g2-e2e** — **G2 success metric hit (2026-05-19).** PR #14 merged (e850809). Worker (Fountain conv `933fbc59`, terminated) claimed issue #3, implemented CONTRIBUTING.md, verified with `mix test` (227 passing), opened PR. Driver merged. Full claim → PR → merge cycle proved with thread continuity. `guild.inevitable.fyi` serves the Phoenix app.
 
 ## Next
 
-_(empty)_
-
-- G1 gates when the ADR PR merges; G2 dispatch follows immediately after.
+_(empty — pending G3 framing)_
 
 ## Gated
 
 - **G0** — resolved. Wedge B selected.
 - **G1** — CLOSED. ADRs 0005–0009 merged (PR #4, 73e4155).
-- **G2** — First worker shippable end-to-end in a sandbox against a seeded issue.
+- **G2** — CLOSED. Worker shipped PR #14 against issue #3, merged 2026-05-19.
 - **G3** — Self-hosting cutover: point the worker at live issues in this repo.
