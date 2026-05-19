@@ -27,13 +27,31 @@ spec:
             # CNPG auto-generates the `guild-pg-app` Secret on Cluster
             # bootstrap. `uri` is the postgres://user:pass@host:port/db
             # URL that Ecto/Phoenix consume directly via DATABASE_URL.
-            # Nginx ignores it for now; wiring is in place so the
-            # Phoenix app starts reading a live database the moment its
-            # Dockerfile replaces this one.
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: guild-pg-app
                   key: uri
+            # Phoenix release env. PHX_SERVER=true makes the release
+            # actually start the endpoint; the Dockerfile sets the same
+            # values but Kubernetes-level env is explicit for operators
+            # reading kubectl describe.
+            - name: PHX_SERVER
+              value: "true"
+            - name: PORT
+              value: "4000"
+            - name: PHX_HOST
+              value: guild.inevitable.fyi
+            # TODO(secret-key-base): wire from a real Secret before any
+            # session/cookie use. The Dockerfile auto-generates one at
+            # container start when unset — acceptable for single-replica
+            # Wedge B with no logged-in users.
           ports:
-            - containerPort: 80
+            - containerPort: 4000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 6
