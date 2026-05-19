@@ -13,6 +13,6 @@ _(empty — orchestrator fills this on dispatch, with `<slice> — <role> (conv 
 ## Gated
 
 - **G0** — Pick the first wedge from the framing PR.
-- **G1** — Wedge plan + ADRs locked (event ingestion path, thread linkage, state persistence, action primitive runtime, worker decision contract).
+- **G1** — Wedge plan + ADRs locked (event ingestion path, thread linkage, state persistence, action primitive runtime, worker decision contract). Runtime ADR already locked: [`decisions/0002-elixir-phoenix-liveview.md`](decisions/0002-elixir-phoenix-liveview.md).
 - **G2** — First worker shippable end-to-end in a sandbox against a seeded issue.
 - **G3** — Self-hosting cutover: point the worker at live issues in this repo.

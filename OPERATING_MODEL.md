@@ -10,6 +10,8 @@ This is the bible the [`captain-picard`](https://github.com/jhgaylor/agent-specs
 
 **Description:** Guild is a platform for building autonomous workers that participate in the software development lifecycle. Teams define workers — agents with persistent awareness, judgment, and presence across GitHub, Slack, and Discord — and Guild provides the plumbing: event ingestion, thread memory, context assembly, action primitives, and state. The architectural reference is the eight component docs under [`docs/`](docs/), starting at [`docs/01-event-stream.md`](docs/01-event-stream.md).
 
+**Runtime:** Elixir, Phoenix, and LiveView. BEAM processes and OTP supervision are the worker runtime; LiveView is the operator UI. See [`decisions/0002-elixir-phoenix-liveview.md`](decisions/0002-elixir-phoenix-liveview.md).
+
 **Success metric:** Guild is used to build Guild. A Guild worker, running on the Guild platform, claims an issue in this repo, opens a PR that passes verification, and gets merged — with the thread model preserving context across the full claim → PR → review → merge cycle.
 
 ## Roles
@@ -56,7 +58,7 @@ The orchestrator dispatches specialists with a written brief at `plan/<slice>/<r
 - **Every change to this repo lands as a PR.** No specialist pushes to `main`. The orchestrator merges after acceptance.
 - **The orchestrator pushes after every state change.** Briefs, ROADMAP edits, and ADRs that aren't pushed are invisible to the next conversation.
 - **Two slices in flight max.** If `ROADMAP.md`'s "Now" has two entries, finish one before dispatching another.
-- **Decisions become ADRs.** When something gets contentious or needs to constrain future work, write `decisions/NNNN-<title>.md`. Use [`decisions/0001-template.md`](decisions/0001-template.md).
+- **Decisions become ADRs.** When something gets contentious or needs to constrain future work, write `decisions/NNNN-<title>.md`. Use [`decisions/0001-template.md`](decisions/0001-template.md). Accepted ADRs: [`0002-elixir-phoenix-liveview.md`](decisions/0002-elixir-phoenix-liveview.md).
 - **The platform docs are the architectural source of truth.** Changes to invariants in [`docs/01-event-stream.md`](docs/01-event-stream.md) through [`docs/08-work-claiming.md`](docs/08-work-claiming.md) require an ADR before the implementing PR. The docs and the code do not get to drift.
 - **Verification is mandatory.** Every code change ships with automated verification per [`docs/05-action-primitives.md#verification-requirement`](docs/05-action-primitives.md#verification-requirement). The orchestrator must reject specialist PRs that lack it — even when Guild itself is the thing being built.
 - **Eat the dogfood.** Where building Guild requires functionality Guild will eventually provide (a queue, an event normalizer, a state store), prefer the dumbest version that lets a Guild worker use it over an abstraction that doesn't. Self-hosting is the success metric; it is also the design constraint.
