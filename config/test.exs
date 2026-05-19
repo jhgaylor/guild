@@ -1,5 +1,7 @@
 import Config
 
+config :guild, :github_adapter, Guild.GitHub.TestAdapter
+
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used

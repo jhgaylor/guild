@@ -10,7 +10,8 @@ import Config
 config :guild,
   ecto_repos: [Guild.Repo],
   generators: [timestamp_type: :utc_datetime],
-  worker_identity: "guild-bot"
+  worker_identity: "guild-bot",
+  github_adapter: Guild.GitHub.TestAdapter
 
 # Configure the endpoint
 config :guild, GuildWeb.Endpoint,
