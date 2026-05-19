@@ -221,5 +221,13 @@ defmodule Guild.Adapters.FountainTest do
 
       assert {:error, :permanent, {:http_error, 404}} = Fountain.observe_conversation("conv-1")
     end
+
+    test "returns {:error, :transient, _} on 503", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "GET", "/api/conversations/conv-123/stream", fn conn ->
+        Plug.Conn.resp(conn, 503, "service unavailable")
+      end)
+
+      assert {:error, :transient, _} = Fountain.observe_conversation("conv-123")
+    end
   end
 end
