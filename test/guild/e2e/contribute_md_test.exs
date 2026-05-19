@@ -16,6 +16,8 @@ defmodule Guild.E2E.ContributeMdTest do
     :ok
   end
 
+  # ExUnit's default 60s timeout fights with the 30-min Fountain poll.
+  @tag timeout: :infinity
   test "worker claims issue #3, writes CONTRIBUTING.md, opens PR" do
     # Step 1: ClaimSeed — creates thread, claims issue #3
     Mix.Tasks.Guild.ClaimSeed.run([
