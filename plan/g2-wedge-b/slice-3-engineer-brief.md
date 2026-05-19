@@ -7,7 +7,7 @@ ADRs 0002-0009 locked. Slice spec: plan/g2-wedge-b/slice-plan.md.
 ## Deliverables
 - `lib/guild/github.ex` — behaviour with 15 callbacks
 - `lib/guild/github/test_adapter.ex` — configurable test double, no HTTP
-- `Guild.Primitives.{Code,Planning,Communication,WorkManagement,Meta}` — 24 primitives
+- `Guild.Primitives.{Code,Planning,Communication,WorkManagement,Meta}` — 20 primitives
 - `lib/guild/adapters/fountain.ex` — 5 HTTP calls via HTTPoison
 - Tests: all three error tiers per primitive; Fountain via Bypass mock
 
