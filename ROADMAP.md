@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- g2-slice-2 — general-purpose-engineer (conv $FOUNTAIN_CONVERSATION_ID)
+- g2-slice-3 — general-purpose-engineer (conv 0849b0fc-6173-4ac8-b626-ae4f88c4b6de)
 
 ## Done
 
@@ -17,6 +17,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 - **g1-adrs** — PR #4 merged (73e4155). ADRs 0005–0009 locked.
 - **g2-slice-plan** — PR #5 merged (b94d49d). G2 slice decomposition locked.
 - **g2-slice-1** — PR #6 merged (404d8ee). Phoenix scaffold + Ecto + all five schemas.
+- **g2-slice-2** — PR #7 merged (ac885d64). State machine + context assembly + worker contracts.
 
 ## Next
 
