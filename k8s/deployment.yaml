@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guild
+  namespace: default
+  labels:
+    app: guild
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guild
+  template:
+    metadata:
+      labels:
+        app: guild
+    spec:
+      containers:
+        - name: guild
+          # `:latest` is mutable — the build workflow rebuilds on every
+          # push to main. Always forces a manifest check on pod start so
+          # `kubectl rollout restart deployment/guild` actually picks up
+          # the new digest. Swap to a pinned tag once releases land.
+          image: ghcr.io/jhgaylor/guild:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80

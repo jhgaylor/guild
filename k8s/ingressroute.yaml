@@ -1,0 +1,37 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: guild
+  namespace: default
+  labels:
+    app: guild
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: "Host(`guild.inevitable.fyi`)"
+      kind: Rule
+      services:
+        - name: guild
+          port: 80
+  tls:
+    secretName: guild-tls
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: guild-http
+  namespace: default
+  labels:
+    app: guild
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: "Host(`guild.inevitable.fyi`)"
+      kind: Rule
+      middlewares:
+        - name: redirect-https
+      services:
+        - name: guild
+          port: 80
