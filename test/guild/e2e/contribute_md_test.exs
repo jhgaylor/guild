@@ -6,6 +6,16 @@ defmodule Guild.E2E.ContributeMdTest do
   @issue_number 3
   @timeout_ms 30 * 60 * 1_000
 
+  # config/test.exs wires Guild.GitHub.TestAdapter so the rest of the suite
+  # runs offline. For the E2E we need the real HttpAdapter so ClaimSeed
+  # and Step 3.5 reconciliation hit GitHub.
+  setup do
+    prior = Application.get_env(:guild, :github_adapter)
+    Application.put_env(:guild, :github_adapter, Guild.GitHub.HttpAdapter)
+    on_exit(fn -> Application.put_env(:guild, :github_adapter, prior) end)
+    :ok
+  end
+
   test "worker claims issue #3, writes CONTRIBUTING.md, opens PR" do
     # Step 1: ClaimSeed — creates thread, claims issue #3
     Mix.Tasks.Guild.ClaimSeed.run([
