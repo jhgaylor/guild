@@ -55,7 +55,7 @@ The orchestrator dispatches specialists with a written brief at `plan/<slice>/<r
 
 ## Working agreements
 
-- **Every change to this repo lands as a PR.** No specialist pushes to `main`. The orchestrator merges after acceptance.
+- **Every change to this repo lands as a PR.** No specialist pushes to `main`. The orchestrator opens PRs, evaluates them against the brief's acceptance criteria, and **stops before every merge to ask the operator**. No auto-merge — the operator is always in the loop on what lands.
 - **The orchestrator pushes after every state change.** Briefs, ROADMAP edits, and ADRs that aren't pushed are invisible to the next conversation.
 - **Two slices in flight max.** If `ROADMAP.md`'s "Now" has two entries, finish one before dispatching another.
 - **Decisions become ADRs.** When something gets contentious or needs to constrain future work, write `decisions/NNNN-<title>.md`. Use [`decisions/0001-template.md`](decisions/0001-template.md). Accepted ADRs: [`0002-elixir-phoenix-liveview.md`](decisions/0002-elixir-phoenix-liveview.md), [`0003-postgres-as-system-of-record.md`](decisions/0003-postgres-as-system-of-record.md), [`0004-fountain-for-worker-execution.md`](decisions/0004-fountain-for-worker-execution.md).
