@@ -4,7 +4,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Orchestrator
 
-_(empty — operator records the active captain-picard `conv_id` here after the first `fountain run`. Subsequent sessions resume with `fountain conv prompt <id>` to preserve the orchestrator's working memory; starting a fresh `fountain run` loses it.)_
+- captain-picard — conv `a42b667b-260d-44f1-8779-7d33da89cd06` (kicked off 2026-05-19 for phase-0-framing). Resume with `fountain conv prompt a42b667b-260d-44f1-8779-7d33da89cd06 -p "..."` — never start a fresh `fountain run` while this is active.
 
 ## Now
 
