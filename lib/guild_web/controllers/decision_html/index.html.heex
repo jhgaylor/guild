@@ -1,0 +1,30 @@
+<Layouts.flash_group flash={@flash} />
+<div class="px-4 py-8">
+  <h1 class="text-2xl font-bold mb-6">Decisions Feed</h1>
+  <table class="w-full border-collapse border border-gray-300">
+    <thead>
+      <tr class="bg-gray-100">
+        <th class="border border-gray-300 px-4 py-2 text-left">Thread</th>
+        <th class="border border-gray-300 px-4 py-2 text-left">Decision Type</th>
+        <th class="border border-gray-300 px-4 py-2 text-left">Reasoning</th>
+        <th class="border border-gray-300 px-4 py-2 text-left">Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      <%= for decision <- @decisions do %>
+        <tr class="hover:bg-gray-50">
+          <td class="border border-gray-300 px-4 py-2">
+            <a href={~p"/threads/#{decision.thread_id}"} class="text-blue-600 hover:underline">
+              <%= if decision.thread, do: "#{decision.thread.anchor_type}/#{decision.thread.anchor_id}", else: decision.thread_id %>
+            </a>
+          </td>
+          <td class="border border-gray-300 px-4 py-2"><%= decision.decision_type %></td>
+          <td class="border border-gray-300 px-4 py-2">
+            <%= String.slice(decision.reasoning || "", 0, 120) %><%= if String.length(decision.reasoning || "") > 120, do: "…" %>
+          </td>
+          <td class="border border-gray-300 px-4 py-2"><%= decision.inserted_at %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

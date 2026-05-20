@@ -15,6 +15,11 @@ defmodule Guild.Schema.Thread do
     field :owner, :string
     field :parent_thread_id, :binary_id
 
+    has_many :events, Guild.Schema.Event, foreign_key: :thread_id
+    has_many :context_notes, Guild.Schema.ContextNote, foreign_key: :thread_id
+    has_many :decisions_log, Guild.Schema.DecisionsLog, foreign_key: :thread_id
+    has_many :artifacts, Guild.Schema.Artifact, foreign_key: :thread_id
+
     timestamps(type: :utc_datetime_usec)
   end
 

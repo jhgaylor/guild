@@ -1,0 +1,137 @@
+<div class="px-4 py-8">
+  <h1 class="text-2xl font-bold mb-4">Thread Detail</h1>
+
+  <section class="mb-8 p-4 border border-gray-300 rounded">
+    <h2 class="text-xl font-semibold mb-2">Thread Info</h2>
+    <dl class="grid grid-cols-2 gap-2">
+      <dt class="font-medium">ID</dt>
+      <dd><%= @thread.id %></dd>
+      <dt class="font-medium">Anchor Type</dt>
+      <dd><%= @thread.anchor_type %></dd>
+      <dt class="font-medium">Anchor ID</dt>
+      <dd><%= @thread.anchor_id %></dd>
+      <dt class="font-medium">State</dt>
+      <dd><%= @thread.state %></dd>
+      <dt class="font-medium">Owner</dt>
+      <dd><%= @thread.owner %></dd>
+      <dt class="font-medium">Created</dt>
+      <dd><%= @thread.inserted_at %></dd>
+      <dt class="font-medium">Updated</dt>
+      <dd><%= @thread.updated_at %></dd>
+    </dl>
+  </section>
+
+  <section class="mb-8">
+    <h2 class="text-xl font-semibold mb-2">Events (<%= length(@thread.events) %>)</h2>
+    <%= if Enum.empty?(@thread.events) do %>
+      <p class="text-gray-500">No events yet.</p>
+    <% else %>
+      <table class="w-full border-collapse border border-gray-300">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="border border-gray-300 px-4 py-2 text-left">Occurred At</th>
+            <th class="border border-gray-300 px-4 py-2 text-left">Source</th>
+            <th class="border border-gray-300 px-4 py-2 text-left">Event Type</th>
+            <th class="border border-gray-300 px-4 py-2 text-left">Actor</th>
+          </tr>
+        </thead>
+        <tbody>
+          <%= for event <- @thread.events do %>
+            <tr class="hover:bg-gray-50">
+              <td class="border border-gray-300 px-4 py-2"><%= event.occurred_at %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= event.source %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= event.event_type %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= event.actor_type %>/<%= event.actor_id %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </section>
+
+  <section class="mb-8">
+    <h2 class="text-xl font-semibold mb-2">Context Notes (<%= length(@thread.context_notes) %>)</h2>
+    <%= if Enum.empty?(@thread.context_notes) do %>
+      <p class="text-gray-500">No context notes yet.</p>
+    <% else %>
+      <table class="w-full border-collapse border border-gray-300">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="border border-gray-300 px-4 py-2 text-left">Type</th>
+            <th class="border border-gray-300 px-4 py-2 text-left">Body</th>
+            <th class="border border-gray-300 px-4 py-2 text-left">Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          <%= for note <- @thread.context_notes do %>
+            <tr class="hover:bg-gray-50">
+              <td class="border border-gray-300 px-4 py-2"><%= note.note_type %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= note.body %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= note.inserted_at %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </section>
+
+  <section class="mb-8">
+    <h2 class="text-xl font-semibold mb-2">Decisions (<%= length(@thread.decisions_log) %>)</h2>
+    <%= if Enum.empty?(@thread.decisions_log) do %>
+      <p class="text-gray-500">No decisions yet.</p>
+    <% else %>
+      <table class="w-full border-collapse border border-gray-300">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="border border-gray-300 px-4 py-2 text-left">Type</th>
+            <th class="border border-gray-300 px-4 py-2 text-left">Reasoning</th>
+            <th class="border border-gray-300 px-4 py-2 text-left">Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          <%= for decision <- @thread.decisions_log do %>
+            <tr class="hover:bg-gray-50">
+              <td class="border border-gray-300 px-4 py-2"><%= decision.decision_type %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= String.slice(decision.reasoning || "", 0, 120) %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= decision.inserted_at %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </section>
+
+  <section class="mb-8">
+    <h2 class="text-xl font-semibold mb-2">Artifacts (<%= length(@thread.artifacts) %>)</h2>
+    <%= if Enum.empty?(@thread.artifacts) do %>
+      <p class="text-gray-500">No artifacts yet.</p>
+    <% else %>
+      <table class="w-full border-collapse border border-gray-300">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="border border-gray-300 px-4 py-2 text-left">Type</th>
+            <th class="border border-gray-300 px-4 py-2 text-left">Source</th>
+            <th class="border border-gray-300 px-4 py-2 text-left">External ID / Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          <%= for artifact <- @thread.artifacts do %>
+            <tr class="hover:bg-gray-50">
+              <td class="border border-gray-300 px-4 py-2"><%= artifact.artifact_type %></td>
+              <td class="border border-gray-300 px-4 py-2"><%= artifact.source %></td>
+              <td class="border border-gray-300 px-4 py-2">
+                <%= if artifact.artifact_type == "fountain_conversation" and @fountain_base_url != "" do %>
+                  <a href={"#{@fountain_base_url}/conversations/#{artifact.external_id}"} class="text-blue-600 hover:underline" target="_blank">
+                    <%= artifact.external_id %>
+                  </a>
+                <% else %>
+                  <%= artifact.external_id %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </section>
+</div>
