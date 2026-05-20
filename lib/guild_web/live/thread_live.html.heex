@@ -1,137 +1,152 @@
-<div class="px-4 py-8">
-  <h1 class="text-2xl font-bold mb-4">Thread Detail</h1>
+<div class="container">
+  <h1 class="page-title">
+    <%= GuildWeb.Format.anchor_label(@thread) %>
+    <span class={"badge badge--#{@thread.state}"} style="margin-left: 0.75rem; font-size: 0.6em; vertical-align: middle;">
+      <%= @thread.state %>
+    </span>
+  </h1>
 
-  <section class="mb-8 p-4 border border-gray-300 rounded">
-    <h2 class="text-xl font-semibold mb-2">Thread Info</h2>
-    <dl class="grid grid-cols-2 gap-2">
-      <dt class="font-medium">ID</dt>
-      <dd><%= @thread.id %></dd>
-      <dt class="font-medium">Anchor Type</dt>
-      <dd><%= @thread.anchor_type %></dd>
-      <dt class="font-medium">Anchor ID</dt>
-      <dd><%= @thread.anchor_id %></dd>
-      <dt class="font-medium">State</dt>
-      <dd><%= @thread.state %></dd>
-      <dt class="font-medium">Owner</dt>
-      <dd><%= @thread.owner %></dd>
-      <dt class="font-medium">Created</dt>
-      <dd><%= @thread.inserted_at %></dd>
-      <dt class="font-medium">Updated</dt>
-      <dd><%= @thread.updated_at %></dd>
+  <section class="info-card">
+    <dl class="info-grid">
+      <dt>ID</dt>
+      <dd><code><%= @thread.id %></code></dd>
+      <dt>Anchor</dt>
+      <dd><span class="mono"><%= @thread.anchor_type %></span> / <span class="mono"><%= @thread.anchor_id %></span></dd>
+      <%= if @thread.anchor_url do %>
+        <dt>URL</dt>
+        <dd><a href={@thread.anchor_url} target="_blank" rel="noopener"><%= @thread.anchor_url %></a></dd>
+      <% end %>
+      <dt>Owner</dt>
+      <dd><%= @thread.owner || raw("<span class=\"muted\">—</span>") %></dd>
+      <dt>Created</dt>
+      <dd class="timestamp"><%= GuildWeb.Format.time(@thread.inserted_at) %></dd>
+      <dt>Updated</dt>
+      <dd class="timestamp"><%= GuildWeb.Format.time(@thread.updated_at) %></dd>
     </dl>
   </section>
 
-  <section class="mb-8">
-    <h2 class="text-xl font-semibold mb-2">Events (<%= length(@thread.events) %>)</h2>
-    <%= if Enum.empty?(@thread.events) do %>
-      <p class="text-gray-500">No events yet.</p>
-    <% else %>
-      <table class="w-full border-collapse border border-gray-300">
-        <thead>
-          <tr class="bg-gray-100">
-            <th class="border border-gray-300 px-4 py-2 text-left">Occurred At</th>
-            <th class="border border-gray-300 px-4 py-2 text-left">Source</th>
-            <th class="border border-gray-300 px-4 py-2 text-left">Event Type</th>
-            <th class="border border-gray-300 px-4 py-2 text-left">Actor</th>
+  <h2 class="section-title">Events (<%= length(@thread.events) %>)</h2>
+  <%= if Enum.empty?(@thread.events) do %>
+    <p class="empty-state">No events yet.</p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Source</th>
+          <th>Type</th>
+          <th>Actor</th>
+        </tr>
+      </thead>
+      <tbody>
+        <%= for event <- @thread.events do %>
+          <tr>
+            <td class="timestamp"><%= GuildWeb.Format.time(event.occurred_at) %></td>
+            <td class="mono"><%= event.source %></td>
+            <td class="mono"><%= event.event_type %></td>
+            <td class="muted">
+              <%= cond do
+                event.actor_type && event.actor_id -> "#{event.actor_type}/#{event.actor_id}"
+                event.actor_type -> event.actor_type
+                event.actor_id -> event.actor_id
+                true -> "—"
+              end %>
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          <%= for event <- @thread.events do %>
-            <tr class="hover:bg-gray-50">
-              <td class="border border-gray-300 px-4 py-2"><%= event.occurred_at %></td>
-              <td class="border border-gray-300 px-4 py-2"><%= event.source %></td>
-              <td class="border border-gray-300 px-4 py-2"><%= event.event_type %></td>
-              <td class="border border-gray-300 px-4 py-2"><%= event.actor_type %>/<%= event.actor_id %></td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    <% end %>
-  </section>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
 
-  <section class="mb-8">
-    <h2 class="text-xl font-semibold mb-2">Context Notes (<%= length(@thread.context_notes) %>)</h2>
-    <%= if Enum.empty?(@thread.context_notes) do %>
-      <p class="text-gray-500">No context notes yet.</p>
-    <% else %>
-      <table class="w-full border-collapse border border-gray-300">
-        <thead>
-          <tr class="bg-gray-100">
-            <th class="border border-gray-300 px-4 py-2 text-left">Type</th>
-            <th class="border border-gray-300 px-4 py-2 text-left">Body</th>
-            <th class="border border-gray-300 px-4 py-2 text-left">Created</th>
+  <h2 class="section-title">Context Notes (<%= length(@thread.context_notes) %>)</h2>
+  <%= if Enum.empty?(@thread.context_notes) do %>
+    <p class="empty-state">No context notes yet.</p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Body</th>
+          <th>When</th>
+        </tr>
+      </thead>
+      <tbody>
+        <%= for note <- @thread.context_notes do %>
+          <tr>
+            <td class="mono"><%= note.note_type %></td>
+            <td><%= note.body %></td>
+            <td class="timestamp"><%= GuildWeb.Format.time(note.inserted_at) %></td>
           </tr>
-        </thead>
-        <tbody>
-          <%= for note <- @thread.context_notes do %>
-            <tr class="hover:bg-gray-50">
-              <td class="border border-gray-300 px-4 py-2"><%= note.note_type %></td>
-              <td class="border border-gray-300 px-4 py-2"><%= note.body %></td>
-              <td class="border border-gray-300 px-4 py-2"><%= note.inserted_at %></td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    <% end %>
-  </section>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
 
-  <section class="mb-8">
-    <h2 class="text-xl font-semibold mb-2">Decisions (<%= length(@thread.decisions_log) %>)</h2>
-    <%= if Enum.empty?(@thread.decisions_log) do %>
-      <p class="text-gray-500">No decisions yet.</p>
-    <% else %>
-      <table class="w-full border-collapse border border-gray-300">
-        <thead>
-          <tr class="bg-gray-100">
-            <th class="border border-gray-300 px-4 py-2 text-left">Type</th>
-            <th class="border border-gray-300 px-4 py-2 text-left">Reasoning</th>
-            <th class="border border-gray-300 px-4 py-2 text-left">Created</th>
+  <h2 class="section-title">Decisions (<%= length(@thread.decisions_log) %>)</h2>
+  <%= if Enum.empty?(@thread.decisions_log) do %>
+    <p class="empty-state">No decisions yet.</p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Reasoning</th>
+          <th>When</th>
+        </tr>
+      </thead>
+      <tbody>
+        <%= for decision <- @thread.decisions_log do %>
+          <tr>
+            <td class="mono"><%= decision.decision_type %></td>
+            <td class="reasoning-cell">
+              <%= String.slice(decision.reasoning || "", 0, 160) %><%= if String.length(decision.reasoning || "") > 160, do: "…" %>
+            </td>
+            <td class="timestamp"><%= GuildWeb.Format.time(decision.inserted_at) %></td>
           </tr>
-        </thead>
-        <tbody>
-          <%= for decision <- @thread.decisions_log do %>
-            <tr class="hover:bg-gray-50">
-              <td class="border border-gray-300 px-4 py-2"><%= decision.decision_type %></td>
-              <td class="border border-gray-300 px-4 py-2"><%= String.slice(decision.reasoning || "", 0, 120) %></td>
-              <td class="border border-gray-300 px-4 py-2"><%= decision.inserted_at %></td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    <% end %>
-  </section>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
 
-  <section class="mb-8">
-    <h2 class="text-xl font-semibold mb-2">Artifacts (<%= length(@thread.artifacts) %>)</h2>
-    <%= if Enum.empty?(@thread.artifacts) do %>
-      <p class="text-gray-500">No artifacts yet.</p>
-    <% else %>
-      <table class="w-full border-collapse border border-gray-300">
-        <thead>
-          <tr class="bg-gray-100">
-            <th class="border border-gray-300 px-4 py-2 text-left">Type</th>
-            <th class="border border-gray-300 px-4 py-2 text-left">Source</th>
-            <th class="border border-gray-300 px-4 py-2 text-left">External ID / Link</th>
-          </tr>
-        </thead>
-        <tbody>
-          <%= for artifact <- @thread.artifacts do %>
-            <tr class="hover:bg-gray-50">
-              <td class="border border-gray-300 px-4 py-2"><%= artifact.artifact_type %></td>
-              <td class="border border-gray-300 px-4 py-2"><%= artifact.source %></td>
-              <td class="border border-gray-300 px-4 py-2">
+  <h2 class="section-title">Artifacts (<%= length(@thread.artifacts) %>)</h2>
+  <%= if Enum.empty?(@thread.artifacts) do %>
+    <p class="empty-state">No artifacts yet.</p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Source</th>
+          <th>Link</th>
+        </tr>
+      </thead>
+      <tbody>
+        <%= for artifact <- @thread.artifacts do %>
+          <tr>
+            <td class="mono"><%= artifact.artifact_type %></td>
+            <td class="mono muted"><%= artifact.source %></td>
+            <td>
+              <%= cond do
+                artifact.url && artifact.url != "" -> nil
+                true -> nil
+              end %>
+              <%= if artifact.url && artifact.url != "" do %>
+                <a href={artifact.url} target="_blank" rel="noopener">
+                  <%= artifact.url %>
+                </a>
+              <% else %>
                 <%= if artifact.artifact_type == "fountain_conversation" and @fountain_base_url != "" do %>
-                  <a href={"#{@fountain_base_url}/conversations/#{artifact.external_id}"} class="text-blue-600 hover:underline" target="_blank">
-                    <%= artifact.external_id %>
+                  <a href={"#{@fountain_base_url}/conversations/#{artifact.external_id}"} target="_blank" rel="noopener">
+                    <code><%= artifact.external_id %></code>
                   </a>
                 <% else %>
-                  <%= artifact.external_id %>
+                  <code><%= artifact.external_id %></code>
                 <% end %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    <% end %>
-  </section>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
 </div>
