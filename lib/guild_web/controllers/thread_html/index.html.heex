@@ -1,32 +1,38 @@
 <Layouts.flash_group flash={@flash} />
-<div class="px-4 py-8">
-  <h1 class="text-2xl font-bold mb-6">Threads</h1>
-  <table class="w-full border-collapse border border-gray-300">
-    <thead>
-      <tr class="bg-gray-100">
-        <th class="border border-gray-300 px-4 py-2 text-left">Anchor Type</th>
-        <th class="border border-gray-300 px-4 py-2 text-left">Anchor ID</th>
-        <th class="border border-gray-300 px-4 py-2 text-left">State</th>
-        <th class="border border-gray-300 px-4 py-2 text-left">Owner</th>
-        <th class="border border-gray-300 px-4 py-2 text-left">Created</th>
-        <th class="border border-gray-300 px-4 py-2 text-left">Updated</th>
-      </tr>
-    </thead>
-    <tbody>
-      <%= for thread <- @threads do %>
-        <tr class="hover:bg-gray-50">
-          <td class="border border-gray-300 px-4 py-2">
-            <a href={~p"/threads/#{thread.id}"} class="text-blue-600 hover:underline">
-              <%= thread.anchor_type %>
-            </a>
-          </td>
-          <td class="border border-gray-300 px-4 py-2"><%= thread.anchor_id %></td>
-          <td class="border border-gray-300 px-4 py-2"><%= thread.state %></td>
-          <td class="border border-gray-300 px-4 py-2"><%= thread.owner %></td>
-          <td class="border border-gray-300 px-4 py-2"><%= thread.inserted_at %></td>
-          <td class="border border-gray-300 px-4 py-2"><%= thread.updated_at %></td>
+<div class="container">
+  <h1 class="page-title">Threads</h1>
+  <p class="page-subtitle">
+    <%= length(@threads) %> threads, most recently updated first.
+  </p>
+
+  <%= if Enum.empty?(@threads) do %>
+    <p class="empty-state">No threads yet. Run <code>mix guild.claim_seed</code> to create one.</p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Anchor</th>
+          <th>State</th>
+          <th>Owner</th>
+          <th>Updated</th>
+          <th>Created</th>
         </tr>
-      <% end %>
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        <%= for thread <- @threads do %>
+          <tr>
+            <td>
+              <a href={~p"/threads/#{thread.id}"} class="anchor-link">
+                <%= GuildWeb.Format.anchor_label(thread) %>
+              </a>
+            </td>
+            <td><span class={"badge badge--#{thread.state}"}><%= thread.state %></span></td>
+            <td class="muted"><%= thread.owner || "—" %></td>
+            <td class="timestamp"><%= GuildWeb.Format.time(thread.updated_at) %></td>
+            <td class="timestamp"><%= GuildWeb.Format.time(thread.inserted_at) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
 </div>

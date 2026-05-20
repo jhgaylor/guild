@@ -4,13 +4,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
-    <.live_title default="Guild" suffix=" · Phoenix Framework" phx-no-format>{assigns[:page_title]}</.live_title>
+    <.live_title default="Guild" suffix=" · Guild" phx-no-format>{assigns[:page_title]}</.live_title>
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
-    <link phx-track-static rel="stylesheet" href={~p"/assets/default.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>
   </head>
   <body>
+    <nav class="app-nav">
+      <a href={~p"/"} class="app-nav__brand">Guild</a>
+      <div class="app-nav__links">
+        <a href={~p"/threads"}>Threads</a>
+        <a href={~p"/decisions"}>Decisions</a>
+      </div>
+    </nav>
     {@inner_content}
   </body>
 </html>

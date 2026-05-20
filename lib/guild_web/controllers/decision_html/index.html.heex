@@ -1,30 +1,40 @@
 <Layouts.flash_group flash={@flash} />
-<div class="px-4 py-8">
-  <h1 class="text-2xl font-bold mb-6">Decisions Feed</h1>
-  <table class="w-full border-collapse border border-gray-300">
-    <thead>
-      <tr class="bg-gray-100">
-        <th class="border border-gray-300 px-4 py-2 text-left">Thread</th>
-        <th class="border border-gray-300 px-4 py-2 text-left">Decision Type</th>
-        <th class="border border-gray-300 px-4 py-2 text-left">Reasoning</th>
-        <th class="border border-gray-300 px-4 py-2 text-left">Created</th>
-      </tr>
-    </thead>
-    <tbody>
-      <%= for decision <- @decisions do %>
-        <tr class="hover:bg-gray-50">
-          <td class="border border-gray-300 px-4 py-2">
-            <a href={~p"/threads/#{decision.thread_id}"} class="text-blue-600 hover:underline">
-              <%= if decision.thread, do: "#{decision.thread.anchor_type}/#{decision.thread.anchor_id}", else: decision.thread_id %>
-            </a>
-          </td>
-          <td class="border border-gray-300 px-4 py-2"><%= decision.decision_type %></td>
-          <td class="border border-gray-300 px-4 py-2">
-            <%= String.slice(decision.reasoning || "", 0, 120) %><%= if String.length(decision.reasoning || "") > 120, do: "…" %>
-          </td>
-          <td class="border border-gray-300 px-4 py-2"><%= decision.inserted_at %></td>
+<div class="container">
+  <h1 class="page-title">Decisions</h1>
+  <p class="page-subtitle">
+    <%= length(@decisions) %> recent decisions across all threads.
+  </p>
+
+  <%= if Enum.empty?(@decisions) do %>
+    <p class="empty-state">No decisions logged yet.</p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Thread</th>
+          <th>Action</th>
+          <th>Reasoning</th>
+          <th>When</th>
         </tr>
-      <% end %>
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        <%= for decision <- @decisions do %>
+          <tr>
+            <td>
+              <a href={~p"/threads/#{decision.thread_id}"} class="anchor-link">
+                <%= if decision.thread,
+                  do: GuildWeb.Format.anchor_label(decision.thread),
+                  else: GuildWeb.Format.short_id(decision.thread_id) %>
+              </a>
+            </td>
+            <td><span class="mono"><%= decision.decision_type %></span></td>
+            <td class="reasoning-cell">
+              <%= String.slice(decision.reasoning || "", 0, 160) %><%= if String.length(decision.reasoning || "") > 160, do: "…" %>
+            </td>
+            <td class="timestamp"><%= GuildWeb.Format.time(decision.inserted_at) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
 </div>
