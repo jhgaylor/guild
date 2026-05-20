@@ -6,7 +6,7 @@ defmodule Guild.Schema.DecisionsLog do
   @foreign_key_type :binary_id
 
   schema "decisions_log" do
-    field :thread_id, :binary_id
+    belongs_to :thread, Guild.Schema.Thread, foreign_key: :thread_id, type: :binary_id
     field :decision_type, :string
     field :reasoning, :string
     field :params, :map
