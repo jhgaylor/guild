@@ -40,6 +40,11 @@ defmodule Guild.Primitives.Meta do
   def update_thread_state(thread_id, event) do
     try do
       thread = Repo.get!(Thread, thread_id)
+      # Ensure StateMachine is loaded so its 9 state atoms are in the table
+      # before `String.to_existing_atom/1`. Without this, calling from a
+      # cold Mix task path raises ArgumentError (the test suite happens to
+      # load StateMachine earlier, masking the bug).
+      Code.ensure_loaded(StateMachine)
       current_state = String.to_existing_atom(thread.state)
 
       case StateMachine.transition(current_state, event) do
