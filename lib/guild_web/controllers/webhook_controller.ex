@@ -140,7 +140,12 @@ defmodule GuildWeb.WebhookController do
   end
 
   defp resolve_thread_id(body) do
-    issue_body = Map.get(body, "body") || ""
+    issue_body =
+      Map.get(body, "body") ||
+        get_in(body, ["pull_request", "body"]) ||
+        get_in(body, ["issue", "body"]) ||
+        ""
+
     regex = ~r/(Closes|Fixes) #(\d+)/i
 
     case Regex.run(regex, issue_body) do
