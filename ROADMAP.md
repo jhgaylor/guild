@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-_(empty — G2 closed; next is G3 deliberation)_
+_(empty — G3 closed; next is G4 framing)_
 
 ## Done
 
@@ -23,14 +23,18 @@ _(empty — G2 closed; next is G3 deliberation)_
 - **g2-slice-5** — PRs #11+#13 merged (88da670/ab6f576). HttpAdapter + E2E test with reconciliation.
 - **g2-infra** — PR #12 merged (6be8635) + fixes 220a719/79b979c/64cbf43/8ad297b. Phoenix release Dockerfile + k8s wiring + SSL/assign/timeout patches.
 - **g2-e2e** — **G2 success metric hit (2026-05-19).** PR #14 merged (e850809). Worker (Fountain conv `933fbc59`, terminated) claimed issue #3, implemented CONTRIBUTING.md, verified with `mix test` (227 passing), opened PR. Driver merged. Full claim → PR → merge cycle proved with thread continuity. `guild.inevitable.fyi` serves the Phoenix app.
+- **g3-slice-1** — webhook ingestion, GitHub adapter, claiming pipeline wired end-to-end.
+- **g3-slice-2** — reconcile loop: executing→pr_open, pr_open→done state transitions.
+- **g3-slice-3** — self-hosting deploy: k8s manifests, live webhook endpoint, operator runbook.
+- **g3-slice-4** — integration test: full webhook→claiming→pr_open→done cycle without live calls. ROADMAP closed 2026-05-24.
 
 ## Next
 
-_(empty — pending G3 framing)_
+- **G4**: pending operator framing.
 
 ## Gated
 
 - **G0** — resolved. Wedge B selected.
 - **G1** — CLOSED. ADRs 0005–0009 merged (PR #4, 73e4155).
 - **G2** — CLOSED. Worker shipped PR #14 against issue #3, merged 2026-05-19.
-- **G3** — Self-hosting cutover: point the worker at live issues in this repo.
+- **G3** — CLOSED 2026-05-24. Self-hosting cutover: integration test + live webhook pipeline merged.
