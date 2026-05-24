@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - postgres.yaml
+  - secret.yaml
   - deployment.yaml
   - service.yaml
   - ingressroute.yaml

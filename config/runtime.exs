@@ -29,6 +29,8 @@ if config_env() != :test do
   config :guild, :github_adapter, Guild.GitHub.HttpAdapter
 end
 
+config :guild, github_webhook_secret: System.get_env("GITHUB_WEBHOOK_SECRET", "")
+
 # Fountain + Guild implementer agent config
 config :guild,
   fountain_base_url: System.get_env("FOUNTAIN_BASE_URL"),
