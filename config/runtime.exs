@@ -28,6 +28,7 @@ config :guild, GuildWeb.Endpoint, http: [port: String.to_integer(System.get_env(
 if config_env() != :test do
   config :guild, :github_adapter, Guild.GitHub.HttpAdapter
   config :guild, github_webhook_secret: System.fetch_env!("GITHUB_WEBHOOK_SECRET")
+  config :guild, worker_vault_id: System.get_env("GUILD_WORKER_VAULT_ID", "")
 end
 
 # Fountain + Guild implementer agent config

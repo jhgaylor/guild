@@ -3,6 +3,7 @@ defmodule GuildWeb.WebhookControllerTest do
 
   import Ecto.Query
   alias Guild.{Repo, Schema}
+  alias Guild.Schema.Thread
 
   @test_secret "test_secret"
 
@@ -167,6 +168,78 @@ defmodule GuildWeb.WebhookControllerTest do
       event = Repo.one(from e in Schema.Event, where: e.event_type == "pull_request.opened")
       assert event != nil
       assert event.thread_id == thread.id
+    end
+  end
+
+  describe "bot-ready claiming" do
+    setup do
+      Application.put_env(:guild, :claim_async, false)
+      bypass = Bypass.open()
+      Application.put_env(:guild, :fountain_base_url, "http://localhost:#{bypass.port}")
+      Application.put_env(:guild, :fountain_api_key, "test_token")
+      Application.put_env(:guild, :guild_implementer_agent_id, "test-agent")
+
+      on_exit(fn ->
+        Application.delete_env(:guild, :claim_async)
+        Application.delete_env(:guild, :fountain_base_url)
+        Application.delete_env(:guild, :fountain_api_key)
+        Application.delete_env(:guild, :guild_implementer_agent_id)
+      end)
+
+      {:ok, bypass: bypass}
+    end
+
+    test "issues.labeled with bot-ready label claims the issue", %{conn: conn, bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-webhook"}}))
+      end)
+
+      body =
+        Jason.encode!(%{
+          "action" => "labeled",
+          "label" => %{"name" => "bot-ready"},
+          "sender" => %{"login" => "octocat"},
+          "issue" => %{"number" => 10, "labels" => [%{"name" => "bot-ready"}]},
+          "repository" => %{"full_name" => "owner/repo"}
+        })
+
+      conn = signed_conn(conn, body, "issues")
+
+      assert conn.status == 200
+
+      thread =
+        Repo.one(
+          from t in Thread,
+            where: t.anchor_type == "github_issue" and t.anchor_id == "10"
+        )
+
+      assert thread != nil
+      assert thread.state == "executing"
+    end
+
+    test "issues.labeled with non-bot-ready label does not create Thread", %{conn: conn} do
+      body =
+        Jason.encode!(%{
+          "action" => "labeled",
+          "label" => %{"name" => "bug"},
+          "sender" => %{"login" => "octocat"},
+          "issue" => %{"number" => 11, "labels" => [%{"name" => "bug"}]},
+          "repository" => %{"full_name" => "owner/repo"}
+        })
+
+      conn = signed_conn(conn, body, "issues")
+
+      assert conn.status == 200
+
+      thread =
+        Repo.one(
+          from t in Thread,
+            where: t.anchor_type == "github_issue" and t.anchor_id == "11"
+        )
+
+      assert thread == nil
     end
   end
 end

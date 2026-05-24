@@ -9,11 +9,29 @@ defmodule Mix.Tasks.Guild.ClaimSeedTest do
 
   setup do
     Guild.GitHub.TestAdapter.reset()
-    :ok
+
+    bypass = Bypass.open()
+    Application.put_env(:guild, :fountain_base_url, "http://localhost:#{bypass.port}")
+    Application.put_env(:guild, :fountain_api_key, "test_token")
+    Application.put_env(:guild, :guild_implementer_agent_id, "test-agent")
+
+    on_exit(fn ->
+      Application.delete_env(:guild, :fountain_base_url)
+      Application.delete_env(:guild, :fountain_api_key)
+      Application.delete_env(:guild, :guild_implementer_agent_id)
+    end)
+
+    {:ok, bypass: bypass}
   end
 
   describe "run/1 happy path" do
-    test "creates a claimed thread and seed event" do
+    test "creates an executing thread and seed event", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-test"}}))
+      end)
+
       Mix.Tasks.Guild.ClaimSeed.run(["--repo", "owner/test", "--issue-number", "42"])
 
       threads =
@@ -26,12 +44,12 @@ defmodule Mix.Tasks.Guild.ClaimSeedTest do
       thread = hd(threads)
       assert thread.anchor_type == "github_issue"
       assert thread.anchor_id == "42"
-      assert thread.state == "claimed"
+      assert thread.state == "executing"
 
       events =
         Repo.all(
           from e in Event,
-            where: e.idempotency_key == "seed:github_issue:42"
+            where: e.idempotency_key == "claim_seed:owner/test:42"
         )
 
       assert length(events) == 1
@@ -39,7 +57,13 @@ defmodule Mix.Tasks.Guild.ClaimSeedTest do
   end
 
   describe "idempotency" do
-    test "double-run produces exactly one thread row and one event row" do
+    test "double-run produces exactly one thread row and one event row", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-idem"}}))
+      end)
+
       Mix.Tasks.Guild.ClaimSeed.run(["--repo", "owner/test", "--issue-number", "99"])
       Mix.Tasks.Guild.ClaimSeed.run(["--repo", "owner/test", "--issue-number", "99"])
 
@@ -55,7 +79,7 @@ defmodule Mix.Tasks.Guild.ClaimSeedTest do
 
       event_count =
         Repo.aggregate(
-          from(e in Event, where: e.idempotency_key == "seed:github_issue:99"),
+          from(e in Event, where: e.idempotency_key == "claim_seed:owner/test:99"),
           :count
         )
 
