@@ -10,6 +10,7 @@ defmodule Guild.Application do
     children = [
       GuildWeb.Telemetry,
       Guild.Repo,
+      {Guild.Reconcile, []},
       {DNSCluster, query: Application.get_env(:guild, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Guild.PubSub},
       # Start a worker by calling: Guild.Worker.start_link(arg)

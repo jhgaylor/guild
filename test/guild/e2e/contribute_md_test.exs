@@ -8,7 +8,7 @@ defmodule Guild.E2E.ContributeMdTest do
 
   # config/test.exs wires Guild.GitHub.TestAdapter so the rest of the suite
   # runs offline. For the E2E we need the real HttpAdapter so ClaimSeed
-  # and Step 3.5 reconciliation hit GitHub.
+  # and reconciliation hit GitHub.
   setup do
     prior = Application.get_env(:guild, :github_adapter)
     Application.put_env(:guild, :github_adapter, Guild.GitHub.HttpAdapter)
@@ -68,50 +68,8 @@ defmodule Guild.E2E.ContributeMdTest do
       interval: 15_000
     )
 
-    # Step 3.5: Reconcile GitHub state into Guild's model.
-    # TODO(reconcile): Move this to Guild.reconcile_thread/1 before G3 so all threads
-    # are reconciled by the orchestrator, not by individual tests.
-    {:ok, prs} = Guild.GitHub.impl().list_pull_requests(@repo, state: "open")
 
-    matching_pr =
-      Enum.find(prs, fn pr ->
-        body = Map.get(pr, "body", "") || ""
-        String.contains?(body, "Closes ##{@issue_number}") or
-          String.contains?(body, "Fixes ##{@issue_number}") or
-          String.contains?(body, "##{@issue_number}")
-      end)
-
-    assert matching_pr != nil,
-           "Expected an open PR referencing issue ##{@issue_number} on #{@repo}"
-
-    pr_number = Map.fetch!(matching_pr, "number")
-    pr_url = Map.fetch!(matching_pr, "html_url")
-
-    Guild.Repo.insert!(%Guild.Schema.Artifact{
-      thread_id: thread.id,
-      artifact_type: "pull_request",
-      source: "github",
-      external_id: to_string(pr_number),
-      url: pr_url
-    })
-
-    {:ok, executing_thread} =
-      Guild.Repo.transaction(fn ->
-        t = Guild.Repo.get!(Guild.Schema.Thread, thread.id)
-        # Transition claimed → executing if needed (ClaimSeed leaves thread as :claimed)
-        t =
-          if t.state == "claimed" do
-            {:ok, :executing} = Guild.StateMachine.transition(:claimed, :dispatch)
-            t |> Ecto.Changeset.change(state: "executing") |> Guild.Repo.update!()
-          else
-            t
-          end
-        # Transition executing → pr_open
-        {:ok, :pr_open} = Guild.StateMachine.transition(:executing, :pr_opened)
-        t |> Ecto.Changeset.change(state: "pr_open") |> Guild.Repo.update!()
-      end)
-
-    _ = executing_thread  # used below in Step 5 assertion
+    Guild.Reconcile.reconcile_all()
 
     # Step 4: Assert a pull_request artifact was written
     pr_artifact =
