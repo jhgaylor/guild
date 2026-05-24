@@ -3,7 +3,10 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - postgres.yaml
-  - secret.yaml
+  # secret.yaml is a template only — the real `guild-app-secrets`
+  # Secret is created out of band via `kubectl create secret generic`
+  # (typically wrapping Infisical). Not included here so Flux doesn't
+  # fight with the operator-managed values.
   - deployment.yaml
   - service.yaml
   - ingressroute.yaml
