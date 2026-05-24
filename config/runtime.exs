@@ -27,9 +27,8 @@ config :guild, GuildWeb.Endpoint, http: [port: String.to_integer(System.get_env(
 # read at call time by Guild.GitHub.HttpAdapter via System.get_env/1.
 if config_env() != :test do
   config :guild, :github_adapter, Guild.GitHub.HttpAdapter
+  config :guild, github_webhook_secret: System.fetch_env!("GITHUB_WEBHOOK_SECRET")
 end
-
-config :guild, github_webhook_secret: System.get_env("GITHUB_WEBHOOK_SECRET", "")
 
 # Fountain + Guild implementer agent config
 config :guild,

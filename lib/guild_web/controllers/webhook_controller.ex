@@ -5,8 +5,6 @@ defmodule GuildWeb.WebhookController do
   alias Guild.{Repo, Schema}
   import Ecto.Query, only: [from: 2]
 
-  @handled_events ~w(issues.opened issues.labeled pull_request.opened pull_request.merged push)
-
   def receive(conn, _params) do
     raw_body = Map.get(conn.private, :raw_body, "")
     secret = Application.get_env(:guild, :github_webhook_secret, "")
@@ -25,16 +23,27 @@ defmodule GuildWeb.WebhookController do
       |> send_resp(403, "forbidden")
       |> halt()
     else
-      event_type = get_req_header(conn, "x-github-event") |> List.first("")
+      gh_event = get_req_header(conn, "x-github-event") |> List.first("")
       body = conn.body_params
+      action = Map.get(body, "action", "")
+      event_type = if action == "", do: gh_event, else: "#{gh_event}.#{action}"
 
-      if event_type in @handled_events do
-        insert_event(conn, event_type, body)
-      else
-        send_resp(conn, 200, "ok")
-      end
+      handle_event(conn, event_type, body)
     end
   end
+
+  defp handle_event(conn, "issues.opened", body), do: insert_event(conn, "issues.opened", body)
+  defp handle_event(conn, "issues.labeled", body), do: insert_event(conn, "issues.labeled", body)
+  defp handle_event(conn, "pull_request.opened", body), do: insert_event(conn, "pull_request.opened", body)
+
+  defp handle_event(conn, "pull_request.closed", body) do
+    merged = get_in(body, ["pull_request", "merged"]) == true
+    effective_type = if merged, do: "pull_request.merged", else: "pull_request.closed"
+    insert_event(conn, effective_type, body)
+  end
+
+  defp handle_event(conn, "push", body), do: insert_event(conn, "push", body)
+  defp handle_event(conn, _event_type, _body), do: send_resp(conn, 200, "ok")
 
   defp insert_event(conn, event_type, body) do
     thread_id = resolve_thread_id(body)
@@ -52,11 +61,14 @@ defmodule GuildWeb.WebhookController do
       idempotency_key: "github:#{event_type}:#{delivery_id}"
     }
 
-    %Schema.Event{}
-    |> Schema.Event.changeset(attrs)
-    |> Repo.insert(on_conflict: :nothing, conflict_target: :idempotency_key)
+    changeset =
+      %Schema.Event{}
+      |> Schema.Event.changeset(attrs)
 
-    send_resp(conn, 200, "ok")
+    case Repo.insert(changeset, on_conflict: :nothing, conflict_target: :idempotency_key) do
+      {:ok, _} -> send_resp(conn, 200, "ok")
+      {:error, _} -> send_resp(conn, 500, "internal error") |> halt()
+    end
   end
 
   defp resolve_thread_id(body) do

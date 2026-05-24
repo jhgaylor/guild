@@ -38,7 +38,7 @@ defmodule GuildWeb.WebhookControllerTest do
         "issue" => %{"number" => 1, "title" => "Bug report"}
       })
 
-      conn = signed_conn(conn, body, "issues.opened")
+      conn = signed_conn(conn, body, "issues")
 
       assert conn.status == 200
 
@@ -56,7 +56,7 @@ defmodule GuildWeb.WebhookControllerTest do
         conn
         |> put_req_header("content-type", "application/json")
         |> put_req_header("x-hub-signature-256", bad_sig)
-        |> put_req_header("x-github-event", "issues.opened")
+        |> put_req_header("x-github-event", "issues")
         |> post(~p"/api/webhooks/github", body)
 
       assert conn.status == 403
@@ -69,7 +69,7 @@ defmodule GuildWeb.WebhookControllerTest do
       conn =
         conn
         |> put_req_header("content-type", "application/json")
-        |> put_req_header("x-github-event", "issues.opened")
+        |> put_req_header("x-github-event", "issues")
         |> post(~p"/api/webhooks/github", body)
 
       assert conn.status == 403
@@ -79,7 +79,7 @@ defmodule GuildWeb.WebhookControllerTest do
 
   describe "event type handling" do
     test "unknown event type returns 200 and no Event row", %{conn: conn} do
-      body = Jason.encode!(%{"action" => "created", "sender" => %{"login" => "octocat"}})
+      body = Jason.encode!(%{"sender" => %{"login" => "octocat"}})
 
       conn = signed_conn(conn, body, "star")
 
@@ -119,7 +119,7 @@ defmodule GuildWeb.WebhookControllerTest do
         "issue" => %{"number" => 42}
       })
 
-      conn = signed_conn(conn, body, "issues.opened")
+      conn = signed_conn(conn, body, "issues")
 
       assert conn.status == 200
 
@@ -135,7 +135,7 @@ defmodule GuildWeb.WebhookControllerTest do
         "sender" => %{"login" => "octocat"}
       })
 
-      conn = signed_conn(conn, body, "issues.opened")
+      conn = signed_conn(conn, body, "issues")
 
       assert conn.status == 200
 
@@ -160,7 +160,7 @@ defmodule GuildWeb.WebhookControllerTest do
         "sender" => %{"login" => "octocat"}
       })
 
-      conn = signed_conn(conn, body, "pull_request.opened")
+      conn = signed_conn(conn, body, "pull_request")
 
       assert conn.status == 200
 

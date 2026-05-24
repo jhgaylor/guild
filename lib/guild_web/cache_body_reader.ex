@@ -5,19 +5,15 @@ defmodule GuildWeb.CacheBodyReader do
   """
 
   @spec read_body(Plug.Conn.t(), keyword()) ::
-          {:ok, binary(), Plug.Conn.t()} | {:more, binary(), Plug.Conn.t()} | {:error, term()}
+          {:ok, binary(), Plug.Conn.t()} | {:error, term()}
   def read_body(conn, opts) do
     case Plug.Conn.read_body(conn, opts) do
       {:ok, body, conn} ->
-        conn = Plug.Conn.put_private(conn, :raw_body, body)
+        conn = put_in(conn.private[:raw_body], body)
         {:ok, body, conn}
 
-      {:more, partial, conn} ->
-        conn = Plug.Conn.put_private(conn, :raw_body, partial)
-        {:more, partial, conn}
-
-      error ->
-        error
+      {:more, _partial, conn} ->
+        {:error, :body_too_large, conn}
     end
   end
 end
