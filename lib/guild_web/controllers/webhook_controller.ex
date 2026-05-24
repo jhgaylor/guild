@@ -17,7 +17,10 @@ defmodule GuildWeb.WebhookController do
 
     actual = get_req_header(conn, "x-hub-signature-256") |> List.first("")
 
-    if not :crypto.hash_equals(expected, actual) do
+    valid? =
+      byte_size(actual) == byte_size(expected) and :crypto.hash_equals(expected, actual)
+
+    if not valid? do
       conn
       |> send_resp(403, "forbidden")
       |> halt()
