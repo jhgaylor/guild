@@ -22,6 +22,42 @@ defmodule Guild.Reconcile do
     :ok
   end
 
+  def reconcile_thread(thread_id) do
+    thread = Repo.get!(Thread, thread_id)
+
+    try do
+      case thread.state do
+        "executing" ->
+          artifact =
+            Repo.one!(
+              from a in Artifact,
+                where: a.thread_id == ^thread.id and a.artifact_type == "fountain_conversation",
+                limit: 1
+            )
+
+          reconcile_executing_thread(thread, artifact)
+
+        "pr_open" ->
+          artifact =
+            Repo.one!(
+              from a in Artifact,
+                where: a.thread_id == ^thread.id and a.artifact_type == "pull_request",
+                limit: 1
+            )
+
+          reconcile_pr_open_thread(thread, artifact)
+
+        state ->
+          Logger.debug("Thread #{thread.id}: state #{state} does not require reconciliation")
+      end
+    rescue
+      e ->
+        Logger.warning("reconcile_thread/1 error for thread #{thread_id}: #{inspect(e)}")
+    end
+
+    :ok
+  end
+
   def handle_info(:reconcile, state) do
     do_reconcile()
     {:noreply, state}

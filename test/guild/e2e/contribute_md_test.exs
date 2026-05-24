@@ -8,7 +8,7 @@ defmodule Guild.E2E.ContributeMdTest do
 
   # config/test.exs wires Guild.GitHub.TestAdapter so the rest of the suite
   # runs offline. For the E2E we need the real HttpAdapter so ClaimSeed
-  # and Step 3.5 reconciliation hit GitHub.
+  # and reconciliation hit GitHub.
   setup do
     prior = Application.get_env(:guild, :github_adapter)
     Application.put_env(:guild, :github_adapter, Guild.GitHub.HttpAdapter)
