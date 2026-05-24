@@ -14,6 +14,12 @@ defmodule GuildWeb.Router do
     plug :accepts, ["json"]
   end
 
+  scope "/api", GuildWeb do
+    pipe_through :api
+
+    post "/webhooks/github", WebhookController, :receive
+  end
+
   scope "/", GuildWeb do
     pipe_through :browser
 

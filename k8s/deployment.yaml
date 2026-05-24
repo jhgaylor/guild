@@ -46,6 +46,9 @@ spec:
             # session/cookie use. The Dockerfile auto-generates one at
             # container start when unset — acceptable for single-replica
             # Wedge B with no logged-in users.
+          envFrom:
+            - secretRef:
+                name: guild-app-secrets
           ports:
             - containerPort: 4000
           readinessProbe:
