@@ -23,36 +23,48 @@ defmodule Guild.Reconcile do
   end
 
   def reconcile_thread(thread_id) do
-    thread = Repo.get!(Thread, thread_id)
+    thread = Repo.get(Thread, thread_id)
 
-    try do
-      case thread.state do
-        "executing" ->
-          artifact =
-            Repo.one!(
-              from a in Artifact,
-                where: a.thread_id == ^thread.id and a.artifact_type == "fountain_conversation",
-                limit: 1
-            )
+    if is_nil(thread) do
+      Logger.debug("reconcile_thread/1: thread #{thread_id} not found")
+    else
+      try do
+        case thread.state do
+          "executing" ->
+            artifact =
+              Repo.one(
+                from a in Artifact,
+                  where: a.thread_id == ^thread.id and a.artifact_type == "fountain_conversation",
+                  limit: 1
+              )
 
-          reconcile_executing_thread(thread, artifact)
+            if artifact do
+              reconcile_executing_thread(thread, artifact)
+            else
+              Logger.debug("Thread #{thread.id}: no fountain_conversation artifact")
+            end
 
-        "pr_open" ->
-          artifact =
-            Repo.one!(
-              from a in Artifact,
-                where: a.thread_id == ^thread.id and a.artifact_type == "pull_request",
-                limit: 1
-            )
+          "pr_open" ->
+            artifact =
+              Repo.one(
+                from a in Artifact,
+                  where: a.thread_id == ^thread.id and a.artifact_type == "pull_request",
+                  limit: 1
+              )
 
-          reconcile_pr_open_thread(thread, artifact)
+            if artifact do
+              reconcile_pr_open_thread(thread, artifact)
+            else
+              Logger.debug("Thread #{thread.id}: no pull_request artifact")
+            end
 
-        state ->
-          Logger.debug("Thread #{thread.id}: state #{state} does not require reconciliation")
+          state ->
+            Logger.debug("Thread #{thread.id}: state #{state} does not require reconciliation")
+        end
+      rescue
+        e ->
+          Logger.warning("reconcile_thread/1 error for thread #{thread_id}: #{inspect(e)}")
       end
-    rescue
-      e ->
-        Logger.warning("reconcile_thread/1 error for thread #{thread_id}: #{inspect(e)}")
     end
 
     :ok
@@ -160,24 +172,30 @@ defmodule Guild.Reconcile do
     pr_number = to_string(Map.get(pr, "number"))
     pr_url = Map.get(pr, "html_url", "")
 
-    %Artifact{}
-    |> Artifact.changeset(%{
-      thread_id: thread.id,
-      artifact_type: "pull_request",
-      source: "github",
-      external_id: pr_number,
-      url: pr_url
-    })
-    |> Repo.insert(on_conflict: :nothing, conflict_target: [:source, :external_id])
+    changeset =
+      %Artifact{}
+      |> Artifact.changeset(%{
+        thread_id: thread.id,
+        artifact_type: "pull_request",
+        source: "github",
+        external_id: pr_number,
+        url: pr_url
+      })
 
-    case Meta.update_thread_state(thread.id, :pr_opened) do
-      {:ok, :pr_open} ->
-        Logger.info("Thread #{thread.id} transitioned executing → pr_open (PR ##{pr_number})")
+    case Repo.insert(changeset, on_conflict: :nothing, conflict_target: [:source, :external_id]) do
+      {:ok, _artifact} ->
+        case Meta.update_thread_state(thread.id, :pr_opened) do
+          {:ok, :pr_open} ->
+            Logger.info("Thread #{thread.id} transitioned executing → pr_open (PR ##{pr_number})")
 
-      {:error, tier, reason} ->
-        Logger.warning(
-          "Thread #{thread.id}: state transition error (#{tier}): #{inspect(reason)}"
-        )
+          {:error, tier, reason} ->
+            Logger.warning(
+              "Thread #{thread.id}: state transition error (#{tier}): #{inspect(reason)}"
+            )
+        end
+
+      {:error, changeset} ->
+        Logger.warning("Thread #{thread.id}: failed to insert pull_request artifact: #{inspect(changeset.errors)}")
     end
   end
 

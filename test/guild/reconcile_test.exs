@@ -58,6 +58,8 @@ defmodule Guild.ReconcileTest do
       insert_seed_event(thread.id)
       insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-test")
 
+      # TestAdapter.configure/2 stores in process dict — safe because reconcile_all/0
+      # runs synchronously in the test process (not via GenServer).
       Guild.GitHub.TestAdapter.configure(:list_pull_requests, {:ok, [
         %{"number" => 42, "html_url" => "https://github.com/owner/test-repo/pull/42", "body" => "Closes #3"}
       ]})
