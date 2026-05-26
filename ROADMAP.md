@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-_(empty — G3 closed; G4 framed at [`plan/g4-framing/framing.md`](plan/g4-framing/framing.md), awaiting slice plan dispatch)_
+- **g4-slice-plan** — captain-picard dispatched 2026-05-26 (conv `a42b667b`) to decompose [`plan/g4-framing/framing.md`](plan/g4-framing/framing.md) into `plan/g4/slice-plan.md`. Stops at PR for driver review; no slice dispatch yet.
 
 ## Done
 
