@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-_(empty — G3 closed; next is G4 framing)_
+_(empty — G3 closed; G4 framed at [`plan/g4-framing/framing.md`](plan/g4-framing/framing.md), awaiting slice plan dispatch)_
 
 ## Done
 
@@ -30,11 +30,12 @@ _(empty — G3 closed; next is G4 framing)_
 
 ## Next
 
-- **G4**: pending operator framing.
+- **G4 — hardening + breadth for unattended operation.** Framed in [`plan/g4-framing/framing.md`](plan/g4-framing/framing.md). Eight items across correctness (duplicate-dispatch race), operability (auth, SECRET_KEY_BASE Secret, webhook retries), maturity (decisions_log retention, context summarization), and breadth (Linear/Slack adapters, multi-worker + multi-repo). Suggested execution order in the framing doc; first slice = race fix + auth + SECRET_KEY_BASE. Driver dispatches captain-picard to write `plan/g4/slice-plan.md`.
 
 ## Gated
 
 - **G0** — resolved. Wedge B selected.
 - **G1** — CLOSED. ADRs 0005–0009 merged (PR #4, 73e4155).
 - **G2** — CLOSED. Worker shipped PR #14 against issue #3, merged 2026-05-19.
-- **G3** — CLOSED 2026-05-24. Self-hosting cutover: integration test + live webhook pipeline merged.
+- **G3** — CLOSED 2026-05-24. Self-hosting cutover: integration test + live webhook pipeline merged. Live-fire verified 2026-05-24: issue #24 → PR #25 (LICENSE) shipped autonomously and merged.
+- **G4** — hardening + breadth for unattended operation. See [`plan/g4-framing/framing.md`](plan/g4-framing/framing.md). Closes when a non-driver human can stand up their own Guild instance and watch it ship a PR autonomously, with operator UI behind auth and worker runtime durable across pod restarts.
