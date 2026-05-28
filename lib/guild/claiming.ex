@@ -26,8 +26,7 @@ defmodule Guild.Claiming do
   """
   def claim_issue(repo, issue_number) do
     with {:ok, _issue} <- Guild.GitHub.impl().get_issue(repo, issue_number),
-         {:ok, thread} <- upsert_and_fetch_thread(issue_number),
-         {:ok, thread} <- advance_to_claimed(thread),
+         {:ok, thread} <- claim_with_lock(issue_number),
          {:ok, _event} <- insert_seed_event(repo, issue_number, thread),
          {:ok, conv_id} <- dispatch_and_store(thread, repo, issue_number),
          {:ok, thread} <- transition_to_executing(thread) do
@@ -39,6 +38,29 @@ defmodule Guild.Claiming do
   end
 
   # --- private helpers ---
+
+  # Wraps check-existing → upsert → claim in a transaction with a PostgreSQL
+  # advisory xact lock. If another caller holds the lock for the same thread,
+  # pg_try_advisory_xact_lock returns false and we abort with :already_claimed.
+  defp claim_with_lock(issue_number) do
+    Repo.transaction(fn ->
+      {:ok, thread} = upsert_and_fetch_thread(issue_number)
+
+      %{rows: [[locked]]} =
+        Ecto.Adapters.SQL.query!(
+          Repo,
+          "SELECT pg_try_advisory_xact_lock(hashtext($1))",
+          [thread.id]
+        )
+
+      unless locked, do: Repo.rollback(:already_claimed)
+
+      case advance_to_claimed(thread) do
+        {:ok, thread} -> thread
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+  end
 
   defp upsert_and_fetch_thread(issue_number) do
     anchor_id = to_string(issue_number)

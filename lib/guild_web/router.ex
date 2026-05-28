@@ -14,6 +14,10 @@ defmodule GuildWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :auth do
+    plug :operator_auth
+  end
+
   scope "/api", GuildWeb do
     pipe_through :api
 
@@ -24,6 +28,11 @@ defmodule GuildWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+  end
+
+  scope "/", GuildWeb do
+    pipe_through [:browser, :auth]
+
     get "/threads", ThreadController, :index
     get "/decisions", DecisionController, :index
     live "/threads/:id", ThreadLive, :show
@@ -33,6 +42,13 @@ defmodule GuildWeb.Router do
   # scope "/api", GuildWeb do
   #   pipe_through :api
   # end
+
+  defp operator_auth(conn, _opts) do
+    Plug.BasicAuth.basic_auth(conn,
+      username: System.fetch_env!("OPERATOR_USERNAME"),
+      password: System.fetch_env!("OPERATOR_PASSWORD")
+    )
+  end
 
   # Enable LiveDashboard in development
   if Application.compile_env(:guild, :dev_routes) do
