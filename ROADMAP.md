@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- _Nothing in flight._ Next candidates: Slice 2 (durable claim queue — needs ADR 0010), or Slices 4/5 (Slack/Linear adapters — no ADRs, parallelizable now that Slice 1 is merged). Per [`plan/g4/slice-plan.md`](plan/g4/slice-plan.md).
+- G4 Slice 2 — ADR 0010 durable claim queue (PR open, awaiting operator approval)
 
 ## Done
 
