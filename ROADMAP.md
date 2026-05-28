@@ -8,9 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g4-slice-plan** — captain-picard dispatched 2026-05-26 (conv `a42b667b`) to decompose [`plan/g4-framing/framing.md`](plan/g4-framing/framing.md) into `plan/g4/slice-plan.md`. Stops at PR for driver review; no slice dispatch yet.
+- **g4-slice-1** — race fix + UI auth + `SECRET_KEY_BASE`. Dispatched to captain-picard (conv `a42b667b`) 2026-05-28. No ADRs. Per [`plan/g4/slice-plan.md`](plan/g4/slice-plan.md) Slice 1. Stops at PR for driver review.
 
 ## Done
+
+- **g4-slice-plan** — PR #26 merged (4aaa848). Six slices covering all 8 G4 framing items; ADR stubs 0010–0013 (Draft). Driver approved plan as-is.
 
 - **phase-0-framing** — PR #1 merged. G0 resolved: Wedge B selected.
 - **g1-wedge-b-plan** — PR #2 merged (4d7cf34). Engineering plan locked.
