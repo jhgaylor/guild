@@ -1,6 +1,14 @@
 defmodule GuildWeb.DecisionControllerTest do
   use GuildWeb.ConnCase
 
+  @username System.get_env("OPERATOR_USERNAME", "test_operator")
+  @password System.get_env("OPERATOR_PASSWORD", "test_password")
+
+  defp with_auth(conn) do
+    credentials = Base.encode64("#{@username}:#{@password}")
+    put_req_header(conn, "authorization", "Basic #{credentials}")
+  end
+
   setup do
     {:ok, thread} =
       %Guild.Schema.Thread{}
@@ -24,7 +32,7 @@ defmodule GuildWeb.DecisionControllerTest do
   end
 
   test "GET /decisions returns 200", %{conn: conn} do
-    conn = get(conn, ~p"/decisions")
+    conn = conn |> with_auth() |> get(~p"/decisions")
     assert html_response(conn, 200) =~ "Decisions"
   end
 end

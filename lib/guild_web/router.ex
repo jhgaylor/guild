@@ -14,6 +14,12 @@ defmodule GuildWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :auth do
+    plug Plug.BasicAuth,
+      username: System.get_env("OPERATOR_USERNAME"),
+      password: System.get_env("OPERATOR_PASSWORD")
+  end
+
   scope "/api", GuildWeb do
     pipe_through :api
 
@@ -24,6 +30,11 @@ defmodule GuildWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+  end
+
+  scope "/", GuildWeb do
+    pipe_through [:browser, :auth]
+
     get "/threads", ThreadController, :index
     get "/decisions", DecisionController, :index
     live "/threads/:id", ThreadLive, :show

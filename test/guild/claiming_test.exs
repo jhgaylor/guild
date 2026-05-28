@@ -71,5 +71,38 @@ defmodule Guild.ClaimingTest do
 
       assert thread_count == 1
     end
+
+    test "concurrent claims: exactly one succeeds and one gets :already_claimed", %{
+      bypass: bypass
+    } do
+      # Only one Fountain dispatch should occur — the losing caller aborts before dispatch
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-race"}}))
+      end)
+
+      parent = self()
+
+      t1 =
+        Task.async(fn ->
+          Ecto.Adapters.SQL.Sandbox.allow(Guild.Repo, parent, self())
+          Claiming.claim_issue("owner/repo", 77)
+        end)
+
+      t2 =
+        Task.async(fn ->
+          Ecto.Adapters.SQL.Sandbox.allow(Guild.Repo, parent, self())
+          Claiming.claim_issue("owner/repo", 77)
+        end)
+
+      results = [Task.await(t1, 10_000), Task.await(t2, 10_000)]
+
+      ok_count = Enum.count(results, &match?({:ok, _}, &1))
+      err_count = Enum.count(results, &match?({:error, :already_claimed}, &1))
+
+      assert ok_count == 1, "expected exactly one successful claim, got: #{inspect(results)}"
+      assert err_count == 1, "expected exactly one :already_claimed, got: #{inspect(results)}"
+    end
   end
 end
