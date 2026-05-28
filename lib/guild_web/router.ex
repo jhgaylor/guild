@@ -15,9 +15,7 @@ defmodule GuildWeb.Router do
   end
 
   pipeline :auth do
-    plug Plug.BasicAuth,
-      username: System.get_env("OPERATOR_USERNAME"),
-      password: System.get_env("OPERATOR_PASSWORD")
+    plug :operator_auth
   end
 
   scope "/api", GuildWeb do
@@ -44,6 +42,13 @@ defmodule GuildWeb.Router do
   # scope "/api", GuildWeb do
   #   pipe_through :api
   # end
+
+  defp operator_auth(conn, _opts) do
+    Plug.BasicAuth.basic_auth(conn,
+      username: System.fetch_env!("OPERATOR_USERNAME"),
+      password: System.fetch_env!("OPERATOR_PASSWORD")
+    )
+  end
 
   # Enable LiveDashboard in development
   if Application.compile_env(:guild, :dev_routes) do
