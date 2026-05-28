@@ -8,10 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g4-slice-1** — race fix + UI auth + `SECRET_KEY_BASE`. Dispatched to captain-picard (conv `a42b667b`) 2026-05-28. No ADRs. Per [`plan/g4/slice-plan.md`](plan/g4/slice-plan.md) Slice 1. Stops at PR for driver review.
+- _Nothing in flight._ Next candidates: Slice 2 (durable claim queue — needs ADR 0010), or Slices 4/5 (Slack/Linear adapters — no ADRs, parallelizable now that Slice 1 is merged). Per [`plan/g4/slice-plan.md`](plan/g4/slice-plan.md).
 
 ## Done
 
+- **g4-slice-1** — PR #27 merged (e79c9c6). Race fix (advisory-lock `claim_issue`), UI BasicAuth on `/threads`,`/decisions`,`/threads/:id`, `SECRET_KEY_BASE` fail-fast. Follow-up fix (9a3b5e2) moved auth creds to a request-time function plug — original compile-time `Plug.BasicAuth` opts baked `nil` into the release router. 248 tests green. Driver merged.
 - **g4-slice-plan** — PR #26 merged (4aaa848). Six slices covering all 8 G4 framing items; ADR stubs 0010–0013 (Draft). Driver approved plan as-is.
 
 - **phase-0-framing** — PR #1 merged. G0 resolved: Wedge B selected.
