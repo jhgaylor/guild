@@ -49,7 +49,14 @@ defmodule Guild.Primitives.Meta do
 
       case StateMachine.transition(current_state, event) do
         {:ok, new_state} ->
-          changeset = Thread.changeset(thread, %{state: to_string(new_state)})
+          attrs =
+            if new_state in [:done, :abandoned] do
+              %{state: to_string(new_state), owner: nil}
+            else
+              %{state: to_string(new_state)}
+            end
+
+          changeset = Thread.changeset(thread, attrs)
           Repo.update!(changeset)
           {:ok, new_state}
 

@@ -16,10 +16,17 @@
           <th>Owner</th>
           <th>Updated</th>
           <th>Created</th>
+          <th>Stuck</th>
         </tr>
       </thead>
       <tbody>
         <%= for thread <- @threads do %>
+          <%
+            age_s = DateTime.diff(DateTime.utc_now(), thread.updated_at)
+            stuck? =
+              (thread.state == "executing" and age_s > 7_200) or
+              (thread.state == "pr_open" and age_s > 172_800)
+          %>
           <tr>
             <td>
               <a href={~p"/threads/#{thread.id}"} class="anchor-link">
@@ -30,6 +37,11 @@
             <td class="muted"><%= thread.owner || "—" %></td>
             <td class="timestamp"><%= GuildWeb.Format.time(thread.updated_at) %></td>
             <td class="timestamp"><%= GuildWeb.Format.time(thread.inserted_at) %></td>
+            <td>
+              <%= if stuck? do %>
+                <span class="badge badge--stuck">stuck</span>
+              <% end %>
+            </td>
           </tr>
         <% end %>
       </tbody>

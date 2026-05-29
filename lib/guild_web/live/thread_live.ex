@@ -10,13 +10,19 @@ defmodule GuildWeb.ThreadLive do
 
     thread = load_thread(id)
     fountain_base_url = Application.get_env(:guild, :fountain_base_url, "")
-    {:ok, assign(socket, thread: thread, fountain_base_url: fountain_base_url)}
+    {:ok, assign(socket, thread: thread, fountain_base_url: fountain_base_url, stuck?: stuck?(thread))}
   end
 
   @impl true
   def handle_info(:refresh, socket) do
     thread = load_thread(socket.assigns.thread.id)
-    {:noreply, assign(socket, thread: thread)}
+    {:noreply, assign(socket, thread: thread, stuck?: stuck?(thread))}
+  end
+
+  defp stuck?(thread) do
+    age_s = DateTime.diff(DateTime.utc_now(), thread.updated_at)
+    (thread.state == "executing" and age_s > 7_200) or
+      (thread.state == "pr_open" and age_s > 172_800)
   end
 
   defp load_thread(id) do

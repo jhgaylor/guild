@@ -33,4 +33,26 @@ defmodule GuildWeb.ThreadControllerTest do
     assert response_body =~ "github_pr"
     assert response_body =~ thread.anchor_id
   end
+
+  test "GET /threads shows stuck badge for over-threshold executing thread", %{conn: conn} do
+    {:ok, stuck_thread} =
+      %Guild.Schema.Thread{}
+      |> Guild.Schema.Thread.changeset(%{
+        anchor_type: "github_issue",
+        anchor_id: "stuck-index-1",
+        state: "executing"
+      })
+      |> Guild.Repo.insert()
+
+    # Set updated_at to 3 hours ago (exceeds 2-hour executing threshold)
+    past = DateTime.add(DateTime.utc_now(), -3 * 3600, :second)
+    import Ecto.Query
+    Guild.Repo.update_all(
+      from(t in Guild.Schema.Thread, where: t.id == ^stuck_thread.id),
+      set: [updated_at: past]
+    )
+
+    conn = conn |> with_auth() |> get(~p"/threads")
+    assert html_response(conn, 200) =~ "stuck"
+  end
 end

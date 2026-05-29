@@ -53,4 +53,28 @@ defmodule GuildWeb.ThreadLiveTest do
       live(conn, ~p"/threads/#{thread.id}")
     end
   end
+
+  test "GET /threads/:id shows stuck warning banner for over-threshold executing thread",
+       %{conn: conn} do
+    {:ok, stuck_thread} =
+      %Guild.Schema.Thread{}
+      |> Guild.Schema.Thread.changeset(%{
+        anchor_type: "github_issue",
+        anchor_id: "stuck-show-1",
+        state: "executing"
+      })
+      |> Guild.Repo.insert()
+
+    # Set updated_at to 3 hours ago (exceeds 2-hour executing threshold)
+    past = DateTime.add(DateTime.utc_now(), -3 * 3600, :second)
+    import Ecto.Query
+    Guild.Repo.update_all(
+      from(t in Guild.Schema.Thread, where: t.id == ^stuck_thread.id),
+      set: [updated_at: past]
+    )
+
+    {:ok, _view, html} = conn |> with_auth() |> live(~p"/threads/#{stuck_thread.id}")
+    assert html =~ "stuck"
+    assert html =~ "Warning"
+  end
 end
