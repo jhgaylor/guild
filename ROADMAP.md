@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- _Nothing in flight._ **G4 complete** (all 6 slices merged 2026-05-29). See Gated → G4.
+- **g5-slice-plan** — captain-picard decomposing [`plan/g5-framing/framing.md`](plan/g5-framing/framing.md) (Operability & trust) into `plan/g5/slice-plan.md`. Driver reviews/approves before any slice dispatches. (G4 complete + deployed; see Gated → G4.)
 
 ## Done
 
@@ -42,7 +42,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Next
 
-- **G5 (not yet framed).** Carry-over follow-ups: wire the optional Linear `:executing → In Progress` transition (helper exists, unused); `threads.owner` release semantics (cleared on terminal state / worker restart — currently set-and-leave); Oban Web UI for operator job visibility; bidirectional adapter sync (Linear/Slack → Guild events); bump base image to OTP 28.1+ (regex-recompile perf warning); workers stay `:running` after opening their PR (benign now that reconcile no longer depends on conv idle — but long-lived convs may warrant a cleanup/timeout). _Resolved post-G4: reconcile stall (PR #36) — see G4 entry._ Frame these into a G5 scope doc before dispatching.
+- **G5 — Operability & trust.** Framed in [`plan/g5-framing/framing.md`](plan/g5-framing/framing.md): make Guild observable + steerable so a human can run it without `kubectl` — Oban/queue visibility, thread timeline UI, stuck/failed surfacing + Slack alerts, Slack human-in-the-loop (hold/abandon), `owner` release semantics, worker-conv lifecycle. Slice plan being written by captain-picard. Deferred to G6: Linear `:executing→In Progress`, bidirectional adapter sync, OTP 28.1+ base-image bump, operator digest.
 
 ## Gated
 
@@ -51,3 +51,4 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 - **G2** — CLOSED. Worker shipped PR #14 against issue #3, merged 2026-05-19.
 - **G3** — CLOSED 2026-05-24. Self-hosting cutover: integration test + live webhook pipeline merged. Live-fire verified 2026-05-24: issue #24 → PR #25 (LICENSE) shipped autonomously and merged.
 - **G4** — CLOSED 2026-05-29. Hardening + breadth for unattended operation; all 8 framing items shipped across 6 slices (PRs #27–#33): (1) duplicate-dispatch race — advisory lock + `threads.owner` CAS; (2) operator-UI auth — BasicAuth + LiveView socket `on_mount`; (3) `SECRET_KEY_BASE` from Secret; (4) durable claim queue — Oban (ADR 0010); (5) decisions_log retention + (6) context summarization (ADRs 0009/0007); (7) Slack + Linear adapters; (8) multi-worker + multi-repo — `workers`/`repos` tables, per-worker creds, repo→worker routing (ADRs 0011–0013). Operator UI behind auth ✓, worker runtime durable across restarts (Oban) ✓, fork-and-configure path via env-seeded `workers`/`repos` ✓. Clean from-scratch build green (296 tests). **Deployed + verified live 2026-05-29:** image rolled to k3s after provisioning `SECRET_KEY_BASE`/`OPERATOR_*` in the live Secret; migrations + `seed()` ran (`workers=[default]`, `repos=[jhgaylor/guild→default]`); auth enforced (`/threads` 401→200). **Live-fire:** issue #34 (`bot-ready`) → webhook → repo-routed → Oban → advisory-lock + `owner` CAS (`owner=default`) → per-worker Fountain dispatch → worker shipped PR #35 (correct CHANGELOG) → merged (`e7c4b78`). Claim→ship-PR loop proven on the hardened path. **Reconcile-to-`done` fixed post-G4 (PR #36, `61bd942`):** Pass A had gated `executing→pr_open` on the worker conv reaching `:idle`, but workers stay alive after opening their PR — so threads stalled. Now reconcile keys off PR existence (any state, `state: "all"`) regardless of conv status. Deployed 2026-05-29; **stuck thread #34 self-healed `executing→done`** within one reconcile tick. Full claim→PR→merge→done cycle now verified live. Carry-overs → G5 (see Next).
+- **G5** — Operability & trust (framed 2026-05-29, [`plan/g5-framing/framing.md`](plan/g5-framing/framing.md)). Closes when the operator can run Guild day-to-day without `kubectl`: UI shows every thread's live state/history/owner, the Oban queue is visible, stuck/failed work is surfaced proactively (UI badge + Slack alert), and the operator can steer an in-flight thread from Slack (≥ hold/abandon) — verified live by observing + steering a real thread through UI/Slack alone.
