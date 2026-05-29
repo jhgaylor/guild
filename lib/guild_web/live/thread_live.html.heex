@@ -124,6 +124,7 @@
           <th>Type</th>
           <th>Source</th>
           <th>Link</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -148,6 +149,13 @@
                 <% else %>
                   <code><%= artifact.external_id %></code>
                 <% end %>
+              <% end %>
+            </td>
+            <td>
+              <%= if artifact.artifact_type == "fountain_conversation" && @conv_status do %>
+                <span class={"conv-status conv-status--#{@conv_status}"}><%= @conv_status %></span>
+              <% else %>
+                <span class="muted">—</span>
               <% end %>
             </td>
           </tr>

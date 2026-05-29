@@ -10,13 +10,28 @@ defmodule GuildWeb.ThreadLive do
 
     thread = load_thread(id)
     fountain_base_url = Application.get_env(:guild, :fountain_base_url, "")
-    {:ok, assign(socket, thread: thread, fountain_base_url: fountain_base_url, stuck?: stuck?(thread))}
+    conv_status = fetch_conv_status(thread)
+    {:ok, assign(socket, thread: thread, fountain_base_url: fountain_base_url, stuck?: stuck?(thread), conv_status: conv_status)}
   end
 
   @impl true
   def handle_info(:refresh, socket) do
     thread = load_thread(socket.assigns.thread.id)
-    {:noreply, assign(socket, thread: thread, stuck?: stuck?(thread))}
+    conv_status = fetch_conv_status(thread)
+    {:noreply, assign(socket, thread: thread, stuck?: stuck?(thread), conv_status: conv_status)}
+  end
+
+  defp fetch_conv_status(thread) do
+    artifact = Enum.find(thread.artifacts, fn a -> a.artifact_type == "fountain_conversation" end)
+
+    if artifact do
+      case Guild.Adapters.Fountain.get_status(artifact.external_id) do
+        {:ok, status} -> status
+        _ -> :unknown
+      end
+    else
+      nil
+    end
   end
 
   defp stuck?(thread) do

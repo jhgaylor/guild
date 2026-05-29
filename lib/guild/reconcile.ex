@@ -83,6 +83,7 @@ defmodule Guild.Reconcile do
     pass_a()
     pass_b()
     pass_c()
+    pass_d()
   end
 
   # Pass A: executing → pr_open
@@ -259,6 +260,50 @@ defmodule Guild.Reconcile do
           )
       end
     end
+  end
+
+  # Pass D: terminate Fountain conversations for done/abandoned threads
+  defp pass_d do
+    threads =
+      Repo.all(
+        from t in Thread,
+          join: a in Artifact,
+          on: a.thread_id == t.id and a.artifact_type == "fountain_conversation",
+          where: t.state in ["done", "abandoned"],
+          select: {t, a}
+      )
+
+    Enum.each(threads, fn {thread, artifact} ->
+      try do
+        conv_id = artifact.external_id
+
+        case Guild.Adapters.Fountain.get_status(conv_id) do
+          {:ok, :terminated} ->
+            Logger.debug(
+              "Thread #{thread.id}: conversation #{conv_id} already terminated, skipping"
+            )
+
+          {:ok, _status} ->
+            case Guild.Adapters.Fountain.terminate_conversation(conv_id) do
+              {:ok, :terminated} ->
+                Logger.info("Thread #{thread.id}: terminated conversation #{conv_id}")
+
+              {:error, tier, reason} ->
+                Logger.warning(
+                  "Thread #{thread.id}: failed to terminate conversation #{conv_id} (#{tier}): #{inspect(reason)}"
+                )
+            end
+
+          {:error, tier, reason} ->
+            Logger.warning(
+              "Thread #{thread.id}: failed to get status for conversation #{conv_id} (#{tier}): #{inspect(reason)}"
+            )
+        end
+      rescue
+        e ->
+          Logger.warning("Reconcile pass D error for thread #{thread.id}: #{inspect(e)}")
+      end
+    end)
   end
 
   # Pass C: alert on stuck threads (executing too long or pr_open too long)
