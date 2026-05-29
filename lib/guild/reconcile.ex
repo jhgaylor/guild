@@ -189,6 +189,10 @@ defmodule Guild.Reconcile do
           {:ok, :pr_open} ->
             Logger.info("Thread #{thread.id} transitioned executing → pr_open (PR ##{pr_number})")
 
+            Guild.Adapters.Slack.post_message(
+              "Thread ##{thread.id}: :pr_open — #{pr_url}"
+            )
+
           {:error, tier, reason} ->
             Logger.warning(
               "Thread #{thread.id}: state transition error (#{tier}): #{inspect(reason)}"
@@ -237,6 +241,17 @@ defmodule Guild.Reconcile do
           Logger.info(
             "Thread #{thread.id} transitioned pr_open → done (PR ##{pr_number} merged)"
           )
+
+          Guild.Adapters.Slack.post_message(
+            "Thread ##{thread.id}: :done"
+          )
+
+          if thread.linear_issue_id do
+            Guild.Adapters.Linear.update_issue(thread.linear_issue_id, %{
+              stateId: Guild.Adapters.Linear.state_id(:done)
+            })
+          end
+
           Guild.Retention.trim_decisions_log(thread.id)
 
         {:error, tier, reason} ->

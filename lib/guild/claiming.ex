@@ -25,11 +25,25 @@ defmodule Guild.Claiming do
   Returns {:ok, %{thread: thread, fountain_conv_id: conv_id}} | {:error, reason}.
   """
   def claim_issue(repo, issue_number) do
-    with {:ok, _issue} <- Guild.GitHub.impl().get_issue(repo, issue_number),
+    with {:ok, issue} <- Guild.GitHub.impl().get_issue(repo, issue_number),
          {:ok, thread} <- claim_with_lock(issue_number),
          {:ok, _event} <- insert_seed_event(repo, issue_number, thread),
          {:ok, conv_id} <- dispatch_and_store(thread, repo, issue_number),
          {:ok, thread} <- transition_to_executing(thread) do
+      issue_title = Map.get(issue, "title", "GitHub Issue ##{issue_number} on #{repo}")
+
+      thread =
+        case Guild.Adapters.Linear.create_issue(%{
+               title: issue_title,
+               description: "Tracking thread ##{thread.id} for #{repo}##{issue_number}"
+             }) do
+          {:ok, %{id: linear_id}} ->
+            Repo.update!(Thread.changeset(thread, %{linear_issue_id: linear_id}))
+
+          _ ->
+            thread
+        end
+
       {:ok, %{thread: thread, fountain_conv_id: conv_id}}
     else
       {:error, reason} -> {:error, reason}

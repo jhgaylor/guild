@@ -49,15 +49,21 @@ defmodule Guild.Primitives.CommunicationTest do
   end
 
   describe "reply_in_thread/3" do
-    test "always returns :permanent :not_configured" do
-      assert {:error, :permanent, :not_configured} =
+    test "returns {:ok, :not_configured} when Slack not configured" do
+      Application.delete_env(:guild, :slack_bot_token)
+      Application.delete_env(:guild, :slack_channel_id)
+
+      assert {:ok, :not_configured} =
                Communication.reply_in_thread("C123", "ts123", "body")
     end
   end
 
   describe "post_to_channel/2" do
-    test "always returns :permanent :not_configured" do
-      assert {:error, :permanent, :not_configured} =
+    test "returns {:ok, :not_configured} when Slack not configured" do
+      Application.delete_env(:guild, :slack_bot_token)
+      Application.delete_env(:guild, :slack_channel_id)
+
+      assert {:ok, :not_configured} =
                Communication.post_to_channel("C123", "hello world")
     end
   end

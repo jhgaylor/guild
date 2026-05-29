@@ -14,6 +14,7 @@ defmodule Guild.Schema.Thread do
     field :state, :string
     field :owner, :string
     field :parent_thread_id, :binary_id
+    field :linear_issue_id, :string
 
     has_many :events, Guild.Schema.Event, foreign_key: :thread_id
     has_many :context_notes, Guild.Schema.ContextNote, foreign_key: :thread_id
@@ -25,7 +26,7 @@ defmodule Guild.Schema.Thread do
 
   def changeset(thread, attrs) do
     thread
-    |> cast(attrs, [:anchor_type, :anchor_id, :anchor_url, :state, :owner, :parent_thread_id])
+    |> cast(attrs, [:anchor_type, :anchor_id, :anchor_url, :state, :owner, :parent_thread_id, :linear_issue_id])
     |> validate_required([:anchor_type, :anchor_id, :state])
     |> validate_inclusion(:state, @valid_states)
     |> unique_constraint([:anchor_type, :anchor_id])
