@@ -33,7 +33,7 @@ The `owner` column stores an opaque string identifier supplied by each worker pr
 
 ## Consequences
 
-- **`threads.owner` column is added this slice.** A migration adds a nullable `owner` string column to the `threads` table. The `Guild.Schema.Thread` Ecto schema and changeset are updated to include the field. (The column already exists in the schema definition — the migration makes it official in the database schema lineage for deployments that pre-date this slice.)
-- **`ClaimWorker` gains a CAS check.** The claiming transaction is updated to perform the conditional update and return `{:cancel, :already_claimed}` on contention. This is a safe, non-breaking change: in a single-worker deployment the `owner IS NULL` condition is always true on first claim.
+- **`threads.owner` already exists — no new migration needed.** The nullable `owner` string column was created in the initial `20260519000001_create_threads` migration (with an `(owner, state)` index), and `Guild.Schema.Thread`'s schema/changeset already include the field. This slice (6a) therefore adds no threads migration for it; the field is ready for the CAS check.
+- **`ClaimWorker` gains a CAS check (Slice 6b).** The claiming transaction will perform the conditional `owner IS NULL` update and return `{:cancel, :already_claimed}` on contention. This is a safe, non-breaking change: in a single-worker deployment the `owner IS NULL` condition is always true on first claim. Wiring is deferred to 6b to keep 6a schema/design-only.
 - **Observability improves.** The `owner` field makes it trivial to query which worker is handling which thread, useful for debugging and future admin tooling.
 - **Release semantics are deferred.** How and when `owner` is cleared (on terminal state, on worker restart, on manual override) is a follow-up concern. For this slice, `owner` is set on claim and not programmatically cleared, which is safe because terminal threads are not re-claimed.
