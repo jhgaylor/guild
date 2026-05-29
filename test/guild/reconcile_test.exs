@@ -52,6 +52,75 @@ defmodule Guild.ReconcileTest do
     artifact
   end
 
+  defp insert_thread_with_id(anchor_id, state, opts \\ []) do
+    {:ok, thread} =
+      %Thread{}
+      |> Thread.changeset(
+        %{anchor_type: "github_issue", anchor_id: anchor_id, state: state}
+        |> Map.merge(Map.new(opts))
+      )
+      |> Repo.insert()
+
+    thread
+  end
+
+  describe "held thread skipping — pass A" do
+    test "pass A skips executing threads with held = true", %{bypass: _bypass} do
+      thread = insert_thread_with_id("held-issue-1", "executing")
+      insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-held")
+      Repo.update!(Thread.changeset(thread, %{held: true}))
+
+      # This PR would normally trigger a transition — but thread is held.
+      Guild.GitHub.TestAdapter.configure(:list_pull_requests, {:ok, [
+        %{"number" => 10, "html_url" => "https://github.com/owner/repo/pull/10", "body" => "Closes #held-issue-1"}
+      ]})
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      updated = Repo.get!(Thread, thread.id)
+      assert updated.state == "executing"
+    end
+  end
+
+  describe "held thread skipping — pass C" do
+    setup %{bypass: _fountain_bypass} do
+      slack_bypass = Bypass.open()
+
+      Application.put_env(:guild, :slack_bot_token, "xoxb-test")
+      Application.put_env(:guild, :slack_channel_id, "C_TEST")
+
+      Application.put_env(
+        :guild,
+        :slack_api_url,
+        "http://localhost:#{slack_bypass.port}/api/chat.postMessage"
+      )
+
+      on_exit(fn ->
+        Application.delete_env(:guild, :slack_bot_token)
+        Application.delete_env(:guild, :slack_channel_id)
+        Application.delete_env(:guild, :slack_api_url)
+      end)
+
+      {:ok, slack_bypass: slack_bypass}
+    end
+
+    test "pass C does not alert on held threads even if they are stuck", %{slack_bypass: slack_bypass} do
+      thread = insert_thread_with_id("held-issue-2", "executing")
+      Repo.update!(Thread.changeset(thread, %{held: true}))
+
+      # Set updated_at to 3 hours ago (exceeds 2-hour executing threshold)
+      past = DateTime.add(DateTime.utc_now(), -3 * 3600, :second)
+      Repo.update_all(from(t in Thread, where: t.id == ^thread.id), set: [updated_at: past])
+
+      Bypass.stub(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        flunk("Pass C should not alert on a held thread")
+        Plug.Conn.resp(conn, 200, Jason.encode!(%{ok: true}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+    end
+  end
+
   describe "pass_a - executing → pr_open" do
     test "transitions to pr_open when a matching PR exists, regardless of worker conv status" do
       thread = insert_thread("executing")
