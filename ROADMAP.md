@@ -8,9 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g4-slices-4-5** — In progress. Slack adapter (`Guild.Adapters.Slack`) + Linear adapter (`Guild.Adapters.Linear`). Branch: `g4/slice-4-5-adapters`. Brief: [`plan/g4-slice-4-5/general-purpose-engineer-brief.md`](plan/g4-slice-4-5/general-purpose-engineer-brief.md).
+- _Nothing in flight._ Last G4 work: Slice 6 (multi-worker + multi-repo) — 6a (ADRs 0011–0013 + schema), then 6b (impl). Per [`plan/g4/slice-plan.md`](plan/g4/slice-plan.md).
 
 ## Done
+
+- **g4-slices-4-5** — PR #31 merged (3c3d16e). Slack adapter (`Guild.Adapters.Slack.post_message`, posts on `:pr_open`/`:done`) + Linear adapter (`Guild.Adapters.Linear` GraphQL create/update). Both graceful no-ops without creds. Driver caught + sent back a broken Linear lifecycle (was passing thread UUID as the Linear issue id + hardcoded state strings); fixed by persisting `linear_issue_id` on threads + env-configurable workflow state UUIDs. 287 tests green. Minor follow-up (G5): wire the optional `:executing → In Progress` Linear transition (helper exists, not called).
 
 - **g4-slice-3** — PR #30 merged (339b326). Retention (ADR 0009: keep recent 200 decisions/thread, null `context_snapshot` on older rows — `Guild.Retention`), summarization (ADR 0007: summarize via Fountain past 50-note threshold, archive superseded notes — `Guild.Summarization`), and LiveView socket auth (`GuildWeb.OperatorAuth` `on_mount` + `live_session` closes the `/live` WS bypass; BasicAuth now sets a session flag). 261 tests green. Driver dropped an env-specific rebar3 `mix.exs` hack the worker had injected (would break clean/fork builds) before merge.
 - **g4-slice-2** — PR #29 merged (4934eac). Durable claim queue via Oban (ADR 0010): `ClaimWorker` on `:claims` queue, args-unique, retry-with-backoff; webhook now enqueues via `Oban.insert` and returns 200 immediately (replaced `Task.start`); Slice-1 advisory lock retained as second-layer guard. 251 tests green. Driver merged.
