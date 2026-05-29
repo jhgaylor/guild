@@ -8,10 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- G5 slice plan (PR open, awaiting driver approval before any slice is dispatched)
+- **g5-slice-1** — in flight. Oban Web `/jobs` (operator-auth gated) + `/threads/:id` timeline (events/decisions/notes/artifacts/owner) + owner column on index. Branch: `g5/slice-1-oban-web-timeline`. Per [`plan/g5/slice-plan.md`](plan/g5/slice-plan.md).
 
 ## Done
 
+- **g5-slice-plan** — PR #37 merged (ff8c537). G5 (Operability & trust) decomposed into 4 slices: (1) Oban Web + thread timeline, (2) stuck/failed surfacing + owner release [ADR 0014], (3) Slack human-in-the-loop [ADR 0015], (4) worker-conv lifecycle + digest. Oban Web chosen over custom view. Driver approved.
 - **g4-slice-6b** — PR #33 merged (a9c5f01). Multi-worker/multi-repo wiring per ADRs 0011–0013: webhook routes by `repos` table → `worker_id` (unconfigured/disabled repos logged + ignored); `ClaimWorker` threads `worker_id` into `Guild.Claiming`, which CAS-claims `threads.owner` inside the advisory-lock txn (0 rows → `{:cancel, :already_claimed}`); Fountain dispatch resolves per-worker `fountain_agent_id`/`vault_id` from the `workers` table (env fallback). Driver added `Guild.Release.seed()` to the Dockerfile entrypoint (was defined but never invoked — strict routing would otherwise drop all webhooks on a fresh deploy). 296 tests green; clean from-scratch build verified.
 
 - **g4-slice-6a** — PR #32 merged (b6a7fcb). Multi-worker/multi-repo ADRs accepted: 0011 (arbitration = advisory lock + optimistic CAS on `threads.owner`), 0012 (per-worker creds via a `workers` table; env vars become seed values), 0013 (multi-repo via a `repos` routing table, single deployment). Schemas `Guild.Schema.Worker`/`Repo` + migrations + `seeds.exs` (default worker/repo from env). Schema/design only, no behavior change. 287 tests green.
