@@ -8,9 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **G4 Slice 6a** — multi-worker/multi-repo ADRs (0011–0013) + schema migrations (workers, repos, threads.owner). Branch: `g4/slice-6a-multiworker-adrs-schema`. No runtime behavior change. Slices 4+5 merged as PR #31.
+- **g4-slice-6b** — in flight. Wiring multi-worker/multi-repo behavior per ADRs 0011–0013: repo→worker routing in webhook, CAS on `threads.owner` in ClaimWorker, per-worker creds lookup, auto-seed on release. Branch: `g4/slice-6b-multiworker-impl`. Last G4 item.
 
 ## Done
+
+- **g4-slice-6a** — PR #32 merged (b6a7fcb). Multi-worker/multi-repo ADRs accepted: 0011 (arbitration = advisory lock + optimistic CAS on `threads.owner`), 0012 (per-worker creds via a `workers` table; env vars become seed values), 0013 (multi-repo via a `repos` routing table, single deployment). Schemas `Guild.Schema.Worker`/`Repo` + migrations + `seeds.exs` (default worker/repo from env). Schema/design only, no behavior change. 287 tests green.
 
 - **g4-slices-4-5** — PR #31 merged (3c3d16e). Slack adapter (`Guild.Adapters.Slack.post_message`, posts on `:pr_open`/`:done`) + Linear adapter (`Guild.Adapters.Linear` GraphQL create/update). Both graceful no-ops without creds. Driver caught + sent back a broken Linear lifecycle (was passing thread UUID as the Linear issue id + hardcoded state strings); fixed by persisting `linear_issue_id` on threads + env-configurable workflow state UUIDs. 287 tests green. Minor follow-up (G5): wire the optional `:executing → In Progress` Linear transition (helper exists, not called).
 
