@@ -179,6 +179,19 @@ defmodule GuildWeb.WebhookControllerTest do
       Application.put_env(:guild, :fountain_api_key, "test_token")
       Application.put_env(:guild, :guild_implementer_agent_id, "test-agent")
 
+      # Seed the worker and repo rows required for multi-repo routing
+      Repo.insert!(%Schema.Worker{
+        worker_id: "default",
+        fountain_agent_id: "test-agent",
+        vault_id: ""
+      })
+
+      Repo.insert!(%Schema.Repo{
+        full_name: "owner/repo",
+        enabled: true,
+        worker_id: "default"
+      })
+
       on_exit(fn ->
         Application.delete_env(:guild, :claim_async)
         Application.delete_env(:guild, :fountain_base_url)
@@ -219,6 +232,40 @@ defmodule GuildWeb.WebhookControllerTest do
       assert thread.state == "executing"
     end
 
+    test "issues.labeled with bot-ready enqueues job with correct worker_id", %{
+      conn: conn,
+      bypass: bypass
+    } do
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-wid"}}))
+      end)
+
+      body =
+        Jason.encode!(%{
+          "action" => "labeled",
+          "label" => %{"name" => "bot-ready"},
+          "sender" => %{"login" => "octocat"},
+          "issue" => %{"number" => 20, "labels" => [%{"name" => "bot-ready"}]},
+          "repository" => %{"full_name" => "owner/repo"}
+        })
+
+      conn = signed_conn(conn, body, "issues")
+
+      assert conn.status == 200
+
+      # Verify thread owner was set from the repo row's worker_id
+      thread =
+        Repo.one(
+          from t in Thread,
+            where: t.anchor_type == "github_issue" and t.anchor_id == "20"
+        )
+
+      assert thread != nil
+      assert thread.owner == "default"
+    end
+
     test "issues.labeled with non-bot-ready label does not create Thread", %{conn: conn} do
       body =
         Jason.encode!(%{
@@ -240,6 +287,127 @@ defmodule GuildWeb.WebhookControllerTest do
         )
 
       assert thread == nil
+    end
+  end
+
+  describe "multi-repo routing" do
+    setup do
+      Application.put_env(:guild, :claim_async, false)
+      bypass = Bypass.open()
+      Application.put_env(:guild, :fountain_base_url, "http://localhost:#{bypass.port}")
+      Application.put_env(:guild, :fountain_api_key, "test_token")
+      Application.put_env(:guild, :guild_implementer_agent_id, "test-agent")
+
+      on_exit(fn ->
+        Application.delete_env(:guild, :claim_async)
+        Application.delete_env(:guild, :fountain_base_url)
+        Application.delete_env(:guild, :fountain_api_key)
+        Application.delete_env(:guild, :guild_implementer_agent_id)
+      end)
+
+      {:ok, bypass: bypass}
+    end
+
+    test "webhook for unconfigured repo returns 200 with no job enqueued", %{conn: conn} do
+      body =
+        Jason.encode!(%{
+          "action" => "labeled",
+          "label" => %{"name" => "bot-ready"},
+          "sender" => %{"login" => "octocat"},
+          "issue" => %{"number" => 30, "labels" => [%{"name" => "bot-ready"}]},
+          "repository" => %{"full_name" => "unconfigured/repo"}
+        })
+
+      conn = signed_conn(conn, body, "issues")
+
+      # Must still return 200 (not 4xx)
+      assert conn.status == 200
+
+      # No thread should be created (no job was enqueued/run)
+      thread =
+        Repo.one(
+          from t in Thread,
+            where: t.anchor_type == "github_issue" and t.anchor_id == "30"
+        )
+
+      assert thread == nil
+    end
+
+    test "webhook for disabled repo returns 200 with no job enqueued", %{conn: conn} do
+      Repo.insert!(%Schema.Worker{
+        worker_id: "disabled-worker",
+        fountain_agent_id: "test-agent",
+        vault_id: ""
+      })
+
+      Repo.insert!(%Schema.Repo{
+        full_name: "disabled/repo",
+        enabled: false,
+        worker_id: "disabled-worker"
+      })
+
+      body =
+        Jason.encode!(%{
+          "action" => "labeled",
+          "label" => %{"name" => "bot-ready"},
+          "sender" => %{"login" => "octocat"},
+          "issue" => %{"number" => 31, "labels" => [%{"name" => "bot-ready"}]},
+          "repository" => %{"full_name" => "disabled/repo"}
+        })
+
+      conn = signed_conn(conn, body, "issues")
+
+      assert conn.status == 200
+
+      thread =
+        Repo.one(
+          from t in Thread,
+            where: t.anchor_type == "github_issue" and t.anchor_id == "31"
+        )
+
+      assert thread == nil
+    end
+
+    test "webhook for configured repo routes to correct worker_id", %{conn: conn, bypass: bypass} do
+      Repo.insert!(%Schema.Worker{
+        worker_id: "specific-worker",
+        fountain_agent_id: "test-agent",
+        vault_id: ""
+      })
+
+      Repo.insert!(%Schema.Repo{
+        full_name: "configured/repo",
+        enabled: true,
+        worker_id: "specific-worker"
+      })
+
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-specific"}}))
+      end)
+
+      body =
+        Jason.encode!(%{
+          "action" => "labeled",
+          "label" => %{"name" => "bot-ready"},
+          "sender" => %{"login" => "octocat"},
+          "issue" => %{"number" => 40, "labels" => [%{"name" => "bot-ready"}]},
+          "repository" => %{"full_name" => "configured/repo"}
+        })
+
+      conn = signed_conn(conn, body, "issues")
+
+      assert conn.status == 200
+
+      thread =
+        Repo.one(
+          from t in Thread,
+            where: t.anchor_type == "github_issue" and t.anchor_id == "40"
+        )
+
+      assert thread != nil
+      assert thread.owner == "specific-worker"
     end
   end
 end

@@ -101,6 +101,19 @@ defmodule GuildWeb.WebhookController do
   defp maybe_claim_from_event(_event_type, _body), do: :ok
 
   defp maybe_claim(repo, issue_number) do
+    case Repo.get(Schema.Repo, repo) do
+      nil ->
+        Logger.warning("Received webhook for unconfigured repo #{inspect(repo)}, ignoring")
+
+      %Schema.Repo{enabled: false} ->
+        Logger.warning("Received webhook for disabled repo #{inspect(repo)}, ignoring")
+
+      %Schema.Repo{worker_id: worker_id} ->
+        enqueue_if_unclaimed(repo, issue_number, worker_id)
+    end
+  end
+
+  defp enqueue_if_unclaimed(repo, issue_number, worker_id) do
     claimed_states = ["claimed", "executing", "pr_open"]
     anchor_id = to_string(issue_number)
 
@@ -117,7 +130,7 @@ defmodule GuildWeb.WebhookController do
     if already_claimed do
       Logger.info("Thread already claimed for issue #{repo}##{issue_number}, skipping")
     else
-      %{"repo" => repo, "issue_number" => issue_number}
+      %{"repo" => repo, "issue_number" => issue_number, "worker_id" => worker_id}
       |> Guild.Workers.ClaimWorker.new()
       |> Oban.insert()
     end

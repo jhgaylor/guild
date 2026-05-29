@@ -5,7 +5,7 @@ defmodule Guild.Workers.ClaimWorkerTest do
   import Ecto.Query
   alias Guild.Repo
   alias Guild.Workers.ClaimWorker
-  alias Guild.Schema.{Thread, Artifact}
+  alias Guild.Schema.{Thread, Artifact, Worker}
 
   @test_agent_id "test-agent-id"
 
@@ -56,9 +56,72 @@ defmodule Guild.Workers.ClaimWorkerTest do
       assert artifact.external_id == "conv-worker-123"
     end
 
+    test "worker_id is threaded from job args to claim_issue", %{bypass: bypass} do
+      Repo.insert!(%Worker{
+        worker_id: "routed-worker",
+        fountain_agent_id: @test_agent_id,
+        vault_id: ""
+      })
+
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-routed"}}))
+      end)
+
+      job_args = %{"repo" => "owner/repo", "issue_number" => 202, "worker_id" => "routed-worker"}
+
+      assert :ok = perform_job(ClaimWorker, job_args)
+
+      thread =
+        Repo.one!(
+          from t in Thread,
+            where: t.anchor_type == "github_issue" and t.anchor_id == "202"
+        )
+
+      assert thread.state == "executing"
+      assert thread.owner == "routed-worker"
+    end
+
+    test "CAS: two jobs for same thread with different worker_ids — one wins, one cancels", %{
+      bypass: bypass
+    } do
+      Repo.insert!(%Worker{
+        worker_id: "cas-worker-1",
+        fountain_agent_id: @test_agent_id,
+        vault_id: ""
+      })
+
+      Repo.insert!(%Worker{
+        worker_id: "cas-worker-2",
+        fountain_agent_id: @test_agent_id,
+        vault_id: ""
+      })
+
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-cas-1"}}))
+      end)
+
+      # First worker claims successfully
+      assert :ok =
+               perform_job(ClaimWorker, %{
+                 "repo" => "owner/repo",
+                 "issue_number" => 777,
+                 "worker_id" => "cas-worker-1"
+               })
+
+      # Second worker is blocked by CAS (thread.owner already set to "cas-worker-1")
+      assert {:cancel, :already_claimed} =
+               perform_job(ClaimWorker, %{
+                 "repo" => "owner/repo",
+                 "issue_number" => 777,
+                 "worker_id" => "cas-worker-2"
+               })
+    end
+
     test "duplicate prevention: worker is configured with uniqueness constraints" do
-      # Validate that the worker declares unique options so Oban prevents
-      # duplicate jobs for the same args from being enqueued concurrently.
       opts = ClaimWorker.__opts__()
       unique_opts = Keyword.get(opts, :unique)
 
@@ -71,7 +134,6 @@ defmodule Guild.Workers.ClaimWorkerTest do
     end
 
     test "transient error: {:error, reason} triggers automatic retry" do
-      # Simulate a transient Fountain failure by using no bypass (connection refused)
       Application.put_env(:guild, :fountain_base_url, "http://localhost:1")
 
       job_args = %{"repo" => "owner/repo", "issue_number" => 303}

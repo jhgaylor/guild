@@ -14,6 +14,47 @@ defmodule Guild.Release do
     end
   end
 
+  def seed do
+    load_app()
+
+    for repo <- repos() do
+      {:ok, _, _} =
+        Ecto.Migrator.with_repo(repo, fn _repo ->
+          default_worker_id = "default"
+          fountain_agent_id = System.get_env("GUILD_IMPLEMENTER_AGENT_ID", "")
+          vault_id = System.get_env("GUILD_WORKER_VAULT_ID", "")
+          github_installation_id = System.get_env("GITHUB_APP_INSTALLATION_ID")
+          github_repo = System.get_env("GITHUB_REPO", "jhgaylor/guild")
+
+          if fountain_agent_id != "" do
+            Guild.Repo.insert!(
+              %Guild.Schema.Worker{
+                worker_id: default_worker_id,
+                fountain_agent_id: fountain_agent_id,
+                vault_id: vault_id,
+                github_installation_id: github_installation_id
+              },
+              on_conflict: :nothing,
+              conflict_target: :worker_id
+            )
+
+            Guild.Repo.insert!(
+              %Guild.Schema.Repo{
+                full_name: github_repo,
+                enabled: true,
+                worker_id: default_worker_id
+              },
+              on_conflict: :nothing,
+              conflict_target: :full_name
+            )
+          else
+            require Logger
+            Logger.warning("GUILD_IMPLEMENTER_AGENT_ID not set; skipping default seed rows")
+          end
+        end)
+    end
+  end
+
   def rollback(repo, version) do
     load_app()
     {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :down, to: version))
