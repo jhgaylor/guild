@@ -4,7 +4,7 @@ defmodule Guild.ClaimingTest do
   import Ecto.Query
   alias Guild.Repo
   alias Guild.Claiming
-  alias Guild.Schema.{Thread, Artifact}
+  alias Guild.Schema.{Thread, Artifact, Worker}
 
   @test_agent_id "test-agent-id"
 
@@ -23,7 +23,7 @@ defmodule Guild.ClaimingTest do
     {:ok, bypass: bypass}
   end
 
-  describe "claim_issue/2" do
+  describe "claim_issue/3" do
     test "happy path: thread ends in :executing with fountain_conversation artifact", %{
       bypass: bypass
     } do
@@ -110,6 +110,80 @@ defmodule Guild.ClaimingTest do
 
       ok_count = Enum.count(results, &match?({:ok, _}, &1))
       assert ok_count >= 1, "expected at least one successful claim, got: #{inspect(results)}"
+    end
+
+    test "CAS: second worker with different worker_id gets {:error, :already_claimed}", %{
+      bypass: bypass
+    } do
+      Repo.insert!(%Worker{
+        worker_id: "worker-a",
+        fountain_agent_id: "agent-a",
+        vault_id: "vault-a"
+      })
+
+      Repo.insert!(%Worker{
+        worker_id: "worker-b",
+        fountain_agent_id: "agent-b",
+        vault_id: "vault-b"
+      })
+
+      # Only worker-a should dispatch; worker-b is blocked by CAS before reaching Fountain
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-worker-a"}}))
+      end)
+
+      assert :ok = perform_claim("owner/repo", 500, "worker-a")
+
+      # Second worker should be blocked by CAS (thread.owner is already "worker-a")
+      assert {:error, :already_claimed} =
+               Guild.Claiming.claim_issue("owner/repo", 500, "worker-b")
+    end
+
+    test "per-worker credentials: uses worker row fountain_agent_id and vault_id", %{
+      bypass: bypass
+    } do
+      custom_agent_id = "custom-fountain-agent"
+
+      Repo.insert!(%Worker{
+        worker_id: "custom-worker",
+        fountain_agent_id: custom_agent_id,
+        vault_id: "custom-vault"
+      })
+
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        # Verify the worker row's agent_id is used, not the env default
+        assert decoded["agent_id"] == custom_agent_id
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-custom"}}))
+      end)
+
+      assert {:ok, _} = Claiming.claim_issue("owner/repo", 600, "custom-worker")
+    end
+
+    test "env fallback: unknown worker_id falls back to env credentials", %{bypass: bypass} do
+      # worker_id "nonexistent" is not in the DB; should fall back to env vars
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-fallback"}}))
+      end)
+
+      assert {:ok, _} = Claiming.claim_issue("owner/repo", 601, "nonexistent-worker")
+    end
+  end
+
+  # Helper: runs a full claim_issue as the ClaimWorker would
+  defp perform_claim(repo, issue_number, worker_id) do
+    Guild.Claiming.claim_issue(repo, issue_number, worker_id)
+    |> case do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 end

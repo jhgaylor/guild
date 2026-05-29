@@ -24,11 +24,11 @@ defmodule Guild.Claiming do
 
   Returns {:ok, %{thread: thread, fountain_conv_id: conv_id}} | {:error, reason}.
   """
-  def claim_issue(repo, issue_number) do
+  def claim_issue(repo, issue_number, worker_id \\ nil) do
     with {:ok, issue} <- Guild.GitHub.impl().get_issue(repo, issue_number),
-         {:ok, thread} <- claim_with_lock(issue_number),
+         {:ok, thread} <- claim_with_lock(issue_number, worker_id),
          {:ok, _event} <- insert_seed_event(repo, issue_number, thread),
-         {:ok, conv_id} <- dispatch_and_store(thread, repo, issue_number),
+         {:ok, conv_id} <- dispatch_and_store(thread, repo, issue_number, worker_id),
          {:ok, thread} <- transition_to_executing(thread) do
       issue_title = Map.get(issue, "title", "GitHub Issue ##{issue_number} on #{repo}")
 
@@ -56,7 +56,9 @@ defmodule Guild.Claiming do
   # Wraps check-existing → upsert → claim in a transaction with a PostgreSQL
   # advisory xact lock. If another caller holds the lock for the same thread,
   # pg_try_advisory_xact_lock returns false and we abort with :already_claimed.
-  defp claim_with_lock(issue_number) do
+  # A CAS on threads.owner then atomically assigns ownership: if owner is already
+  # set (non-nil), the CAS returns 0 rows and we rollback with :already_claimed.
+  defp claim_with_lock(issue_number, worker_id) do
     Repo.transaction(fn ->
       {:ok, thread} = upsert_and_fetch_thread(issue_number)
 
@@ -69,6 +71,19 @@ defmodule Guild.Claiming do
 
       unless locked, do: Repo.rollback(:already_claimed)
 
+      # CAS: atomically claim ownership if thread is unclaimed (owner IS NULL).
+      # For nil worker_id this is a nil→nil update (counted as 1 row updated by PG),
+      # preserving backward-compat for single-worker deployments.
+      {updated, _} =
+        Repo.update_all(
+          from(t in Thread, where: t.id == ^thread.id and is_nil(t.owner)),
+          set: [owner: worker_id]
+        )
+
+      if updated == 0, do: Repo.rollback(:already_claimed)
+
+      thread = Repo.get!(Thread, thread.id)
+
       case advance_to_claimed(thread) do
         {:ok, thread} -> thread
         {:error, reason} -> Repo.rollback(reason)
@@ -78,14 +93,12 @@ defmodule Guild.Claiming do
 
   defp upsert_and_fetch_thread(issue_number) do
     anchor_id = to_string(issue_number)
-    owner = Application.get_env(:guild, :worker_identity, "guild")
 
     changeset =
       Thread.changeset(%Thread{}, %{
         anchor_type: "github_issue",
         anchor_id: anchor_id,
-        state: "unnoticed",
-        owner: owner
+        state: "unnoticed"
       })
 
     Repo.insert(changeset, on_conflict: :nothing, conflict_target: [:anchor_type, :anchor_id])
@@ -138,7 +151,7 @@ defmodule Guild.Claiming do
 
   # Idempotent: if a fountain_conversation artifact already exists for this thread,
   # return its conv_id without re-dispatching.
-  defp dispatch_and_store(thread, repo, issue_number) do
+  defp dispatch_and_store(thread, repo, issue_number, worker_id) do
     case Repo.one(
            from a in Artifact,
              where:
@@ -150,8 +163,7 @@ defmodule Guild.Claiming do
         {:ok, conv_id}
 
       nil ->
-        agent_id = Application.get_env(:guild, :guild_implementer_agent_id)
-        vault_id = Application.get_env(:guild, :worker_vault_id, "")
+        {agent_id, vault_id} = resolve_worker_credentials(worker_id)
 
         prompt =
           "Implement GitHub issue ##{issue_number} on #{repo}. " <>
@@ -175,6 +187,25 @@ defmodule Guild.Claiming do
           {:error, tier, reason} ->
             {:error, {tier, reason}}
         end
+    end
+  end
+
+  # Look up per-worker credentials from the workers table.
+  # Falls back to env vars when worker_id is nil or the row is absent.
+  defp resolve_worker_credentials(nil) do
+    agent_id = Application.get_env(:guild, :guild_implementer_agent_id)
+    vault_id = Application.get_env(:guild, :worker_vault_id, "")
+    {agent_id, vault_id}
+  end
+
+  defp resolve_worker_credentials(worker_id) do
+    case Repo.get(Guild.Schema.Worker, worker_id) do
+      %Guild.Schema.Worker{fountain_agent_id: agent_id, vault_id: vault_id} ->
+        {agent_id, vault_id}
+
+      nil ->
+        Logger.warning("Worker #{inspect(worker_id)} not found, falling back to env credentials")
+        resolve_worker_credentials(nil)
     end
   end
 

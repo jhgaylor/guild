@@ -55,4 +55,4 @@ EXPOSE 4000
 ENTRYPOINT ["/usr/bin/tini", "--"]
 # SECRET_KEY_BASE must be supplied via environment (e.g. k8s Secret).
 # Startup fails immediately if the variable is absent.
-CMD ["/bin/sh", "-c", "/app/bin/guild eval 'Guild.Release.migrate()' && exec /app/bin/guild start"]
+CMD ["/bin/sh", "-c", "/app/bin/guild eval 'Guild.Release.migrate()' && /app/bin/guild eval 'Guild.Release.seed()' && exec /app/bin/guild start"]
