@@ -8,10 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g5-slice-3 ADR** — G5 Slice 3 — ADR 0015 inbound Slack control (PR open, awaiting driver approval)
+- **g5-slice-3** — in flight. Slack human-in-the-loop per ADR 0015: `/guild hold|resume|abandon <issue#>` slash command (v0 HMAC, fail-secure), `held` flag, `Guild.Control`, reconcile Pass A/C skip held. Branch: `g5/slice-3-slack-hitl`.
 
 ## Done
 
+- **g5-adr-0015** — PR #41 merged (c7c1d8c). Inbound Slack control: slash command surface, v0 HMAC verification (fail-secure + replay guard), `held` boolean flag (orthogonal to state machine), hold/resume/abandon → held flag + Oban job cancel + `:abandoned`; thread resolution by issue#. Events API + interactive buttons deferred to G6. Driver approved.
 - **g5-slice-2** — PR #40 merged (2ba071e). Stuck/failed surfacing + `owner` release (ADR 0014): Reconcile Pass C alerts on `:executing`>2h / `:pr_open`>48h via Slack (deduped by `last_alerted_at` + 6h cooldown); `owner` cleared on terminal state in `Meta.update_thread_state`; stuck badge on index + banner on detail. `last_alerted_at` migration. 306 tests green. Driver stripped a stray `docs/superpowers/` scratch plan the worker committed.
 - **g5-adr-0014** — PR #39 merged (7e6f247). Stuck-thread detection (Reconcile Pass C; `:executing`>2h / `:pr_open`>48h via `updated_at`), Slack alert deduped by `last_alerted_at` + 6h cooldown, `owner` cleared on terminal state. `updated_at`-as-state-age proxy accepted (state_entered_at deferred). Driver approved.
 - **g5-slice-1** — PR #38 merged (52d06f4). Oban Web dashboard mounted at `/jobs` inside the `:auth` pipeline (`oban_web` 2.12.5, free from public hex). Thread detail (`/threads/:id`) already rendered owner + Events/Context Notes/Decisions/Artifacts (with PR + Fountain conv links) from G2.5, so legibility content pre-existed — worker added the queue view. 301 tests green. Deviations (deferred polish): sectioned view rather than a single *interleaved* timeline; no `context_snapshot`-nil indicator. Driver scoped the `/jobs` test to the auth gate (full render needs Oban.Met, absent under `:inline`).
