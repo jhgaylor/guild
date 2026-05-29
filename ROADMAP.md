@@ -8,9 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g5-slice-4** — in progress (branch `g5/slice-4-conv-lifecycle`, kicked off 2026-05-29). Worker-conv lifecycle: Reconcile Pass D terminates Fountain convs on terminal thread state; conv status shown in thread detail. Digest deferred to G6. _(Slice 3 PR #42 merged; CI building → deploy. Slack stays fail-secure-dormant until operator provisions SLACK_SIGNING_SECRET + a /guild slash command.)_
+- **g5-slice-4 deploy + G5 close** — PR #43 merged; CI building → deploy, then G5 closing verification. All 4 G5 slices merged.
 
 ## Done
+
+- **g5-slice-4** — PR #43 merged (ab69f3f). Worker-conv lifecycle: Reconcile Pass D terminates the Fountain conv for `:done`/`:abandoned` threads (idempotent — skips already-`:terminated` via `get_status`, uses existing `Fountain.terminate_conversation/1`, per-thread try/rescue); conv status shown in thread detail. Digest deferred to G6. 329 tests green. Fixes the worker-conv accumulation surfaced in the G4 live-fire. (G6 note: re-checks `get_status` for every terminal thread each cycle — add an artifact terminated flag to skip.)
 
 - **g5-slice-3** — PR #42 merged (4e2c870). Slack human-in-the-loop (ADR 0015): `GuildWeb.SlackController` `POST /slack/commands` with v0 HMAC verification (fail-secure + 5-min replay guard, raw body via CacheBodyReader); `Guild.Control` hold/resume/abandon (resolve by issue# or UUID); `held` flag + migration; reconcile Pass A/C skip held threads; abandon→`:abandoned` (reused existing state-machine transition) + Oban job cancel; `SLACK_SIGNING_SECRET` in secret.yaml. 326 tests green.
 
