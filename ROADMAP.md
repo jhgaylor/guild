@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g5-slice-2** — in flight. Stuck/failed surfacing + `owner` release per ADR 0014: Reconcile Pass C (executing>2h / pr_open>48h → Slack alert, deduped via `last_alerted_at` + 6h cooldown), clear `owner` on terminal state, stuck badges in UI. Branch: `g5/slice-2-stuck-surfacing`.
+- **g5-slice-2** — implementation in progress. Stuck/failed surfacing + `owner` release per ADR 0014: Reconcile Pass C (executing>2h / pr_open>48h → Slack alert, deduped via `last_alerted_at` + 6h cooldown), clear `owner` on terminal state, stuck badges in UI. Branch: `g5/slice-2-stuck-surfacing`. Brief: `plan/g5-slice-2/general-purpose-engineer-brief.md`.
 
 ## Done
 
