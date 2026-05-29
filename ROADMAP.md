@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g5-slice-3 ADR** — G5 Slice 3 — ADR 0015 inbound Slack control (PR open, awaiting driver approval)
+- **g5-slice-3 impl** — G5 Slice 3 — Slack HITL (hold/resume/abandon) implementation in progress on branch `g5/slice-3-slack-hitl`. Brief at `plan/g5-slice-3/general-purpose-engineer-brief.md`. ADR 0015 accepted.
 
 ## Done
 
