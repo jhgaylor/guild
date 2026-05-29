@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g5-slice-2 ADR** — captain-picard drafting ADR 0014 (stuck-thread thresholds + notify policy) for Slice 2. ADR-first; driver approves before implementation. _(Slice 1 deployed + live-verified 2026-05-29: `/jobs` 401→200, Oban Web dashboard renders.)_
+G5 Slice 2 — ADR 0014 stuck threshold/notify policy (PR open, awaiting driver approval)
 
 ## Done
 
