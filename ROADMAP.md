@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g5-slice-1** — in flight. Oban Web `/jobs` (operator-auth gated) + `/threads/:id` timeline (events/decisions/notes/artifacts/owner) + owner column on index. Branch: `g5/slice-1-oban-web-timeline`. Per [`plan/g5/slice-plan.md`](plan/g5/slice-plan.md).
+- **g5-slice-1** — in progress. Engineer brief written ([`plan/g5-slice-1/general-purpose-engineer-brief.md`](plan/g5-slice-1/general-purpose-engineer-brief.md)). Oban Web `/jobs` (operator-auth gated) + `/threads/:id` timeline (events/decisions/notes/artifacts/owner) + owner column on index. Branch: `g5/slice-1-oban-web-timeline`.
 
 ## Done
 
