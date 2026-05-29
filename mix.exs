@@ -58,7 +58,8 @@ defmodule Guild.MixProject do
       {:joken, "~> 2.6"},
       {:jose, "~> 1.11"},
       {:bypass, "~> 2.1", only: :test},
-      {:oban, "~> 2.18"}
+      {:oban, "~> 2.18"},
+      {:oban_web, "~> 2.11"}
     ]
   end
 
