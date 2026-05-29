@@ -8,10 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-G5 Slice 2 — ADR 0014 stuck threshold/notify policy (PR open, awaiting driver approval)
+- **g5-slice-2** — in flight. Stuck/failed surfacing + `owner` release per ADR 0014: Reconcile Pass C (executing>2h / pr_open>48h → Slack alert, deduped via `last_alerted_at` + 6h cooldown), clear `owner` on terminal state, stuck badges in UI. Branch: `g5/slice-2-stuck-surfacing`.
 
 ## Done
 
+- **g5-adr-0014** — PR #39 merged (7e6f247). Stuck-thread detection (Reconcile Pass C; `:executing`>2h / `:pr_open`>48h via `updated_at`), Slack alert deduped by `last_alerted_at` + 6h cooldown, `owner` cleared on terminal state. `updated_at`-as-state-age proxy accepted (state_entered_at deferred). Driver approved.
 - **g5-slice-1** — PR #38 merged (52d06f4). Oban Web dashboard mounted at `/jobs` inside the `:auth` pipeline (`oban_web` 2.12.5, free from public hex). Thread detail (`/threads/:id`) already rendered owner + Events/Context Notes/Decisions/Artifacts (with PR + Fountain conv links) from G2.5, so legibility content pre-existed — worker added the queue view. 301 tests green. Deviations (deferred polish): sectioned view rather than a single *interleaved* timeline; no `context_snapshot`-nil indicator. Driver scoped the `/jobs` test to the auth gate (full render needs Oban.Met, absent under `:inline`).
 - **g5-slice-plan** — PR #37 merged (ff8c537). G5 (Operability & trust) decomposed into 4 slices: (1) Oban Web + thread timeline, (2) stuck/failed surfacing + owner release [ADR 0014], (3) Slack human-in-the-loop [ADR 0015], (4) worker-conv lifecycle + digest. Oban Web chosen over custom view. Driver approved.
 - **g4-slice-6b** — PR #33 merged (a9c5f01). Multi-worker/multi-repo wiring per ADRs 0011–0013: webhook routes by `repos` table → `worker_id` (unconfigured/disabled repos logged + ignored); `ClaimWorker` threads `worker_id` into `Guild.Claiming`, which CAS-claims `threads.owner` inside the advisory-lock txn (0 rows → `{:cancel, :already_claimed}`); Fountain dispatch resolves per-worker `fountain_agent_id`/`vault_id` from the `workers` table (env fallback). Driver added `Guild.Release.seed()` to the Dockerfile entrypoint (was defined but never invoked — strict routing would otherwise drop all webhooks on a fresh deploy). 296 tests green; clean from-scratch build verified.
