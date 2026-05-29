@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- _Nothing in flight._ Driver sweeping remaining G4: Slices 4/5 (Slack/Linear adapters) next, then Slice 6 (multi-worker/multi-repo: ADRs 0011–0013 + impl). Per [`plan/g4/slice-plan.md`](plan/g4/slice-plan.md).
+- **g4-slices-4-5** — In progress. Slack adapter (`Guild.Adapters.Slack`) + Linear adapter (`Guild.Adapters.Linear`). Branch: `g4/slice-4-5-adapters`. Brief: [`plan/g4-slice-4-5/general-purpose-engineer-brief.md`](plan/g4-slice-4-5/general-purpose-engineer-brief.md).
 
 ## Done
 
