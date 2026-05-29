@@ -29,6 +29,8 @@ if config_env() != :test do
   config :guild, :github_adapter, Guild.GitHub.HttpAdapter
   config :guild, github_webhook_secret: System.fetch_env!("GITHUB_WEBHOOK_SECRET")
   config :guild, worker_vault_id: System.get_env("GUILD_WORKER_VAULT_ID", "")
+  # Optional: if absent, all /slack/commands requests are rejected 403 (fail-secure).
+  config :guild, slack_signing_secret: System.get_env("SLACK_SIGNING_SECRET")
 end
 
 # Fountain + Guild implementer agent config

@@ -92,7 +92,7 @@ defmodule Guild.Reconcile do
         from t in Thread,
           join: a in Artifact,
           on: a.thread_id == t.id and a.artifact_type == "fountain_conversation",
-          where: t.state == "executing",
+          where: t.state == "executing" and t.held == false,
           select: {t, a}
       )
 
@@ -275,7 +275,8 @@ defmodule Guild.Reconcile do
           where:
             (t.state == "executing" and t.updated_at < ^executing_cutoff) or
               (t.state == "pr_open" and t.updated_at < ^pr_open_cutoff),
-          where: is_nil(t.last_alerted_at) or t.last_alerted_at < ^cooldown_cutoff
+          where: is_nil(t.last_alerted_at) or t.last_alerted_at < ^cooldown_cutoff,
+          where: t.held == false
       )
 
     Enum.each(stuck_threads, fn thread ->
