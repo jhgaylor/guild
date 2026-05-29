@@ -8,9 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g5-slice-3** — in flight. Slack human-in-the-loop per ADR 0015: `/guild hold|resume|abandon <issue#>` slash command (v0 HMAC, fail-secure), `held` flag, `Guild.Control`, reconcile Pass A/C skip held. Branch: `g5/slice-3-slack-hitl`.
+- **g5-slice-4** — in flight (final G5 slice). Worker-conv lifecycle: Reconcile Pass D terminates Fountain convs on terminal thread state; conv status shown in thread detail. Digest deferred to G6. _(Slice 3 PR #42 merged; CI building → deploy. Slack stays fail-secure-dormant until operator provisions SLACK_SIGNING_SECRET + a /guild slash command.)_
 
 ## Done
+
+- **g5-slice-3** — PR #42 merged (4e2c870). Slack human-in-the-loop (ADR 0015): `GuildWeb.SlackController` `POST /slack/commands` with v0 HMAC verification (fail-secure + 5-min replay guard, raw body via CacheBodyReader); `Guild.Control` hold/resume/abandon (resolve by issue# or UUID); `held` flag + migration; reconcile Pass A/C skip held threads; abandon→`:abandoned` (reused existing state-machine transition) + Oban job cancel; `SLACK_SIGNING_SECRET` in secret.yaml. 326 tests green.
 
 - **g5-adr-0015** — PR #41 merged (c7c1d8c). Inbound Slack control: slash command surface, v0 HMAC verification (fail-secure + replay guard), `held` boolean flag (orthogonal to state machine), hold/resume/abandon → held flag + Oban job cancel + `:abandoned`; thread resolution by issue#. Events API + interactive buttons deferred to G6. Driver approved.
 - **g5-slice-2** — PR #40 merged (2ba071e). Stuck/failed surfacing + `owner` release (ADR 0014): Reconcile Pass C alerts on `:executing`>2h / `:pr_open`>48h via Slack (deduped by `last_alerted_at` + 6h cooldown); `owner` cleared on terminal state in `Meta.update_thread_state`; stuck badge on index + banner on detail. `last_alerted_at` migration. 306 tests green. Driver stripped a stray `docs/superpowers/` scratch plan the worker committed.
