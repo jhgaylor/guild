@@ -64,5 +64,17 @@ defmodule Guild.Schema.ContextNoteTest do
         assert %{valid?: true} = ContextNote.changeset(%ContextNote{}, attrs)
       end
     end
+
+    test "accepts summary note_type" do
+      thread = insert_thread!()
+      attrs = %{thread_id: thread.id, note_type: "summary", body: "Thread context summary."}
+      assert %{valid?: true} = ContextNote.changeset(%ContextNote{}, attrs)
+    end
+
+    test "accepts archived note_type" do
+      thread = insert_thread!()
+      attrs = %{thread_id: thread.id, note_type: "archived", body: "Old note, now archived."}
+      assert %{valid?: true} = ContextNote.changeset(%ContextNote{}, attrs)
+    end
   end
 end

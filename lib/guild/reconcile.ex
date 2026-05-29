@@ -102,6 +102,7 @@ defmodule Guild.Reconcile do
   end
 
   defp reconcile_executing_thread(thread, artifact) do
+    Guild.Summarization.maybe_summarize(thread.id)
     conv_id = artifact.external_id
 
     case Guild.Adapters.Fountain.get_status(conv_id) do
@@ -236,6 +237,7 @@ defmodule Guild.Reconcile do
           Logger.info(
             "Thread #{thread.id} transitioned pr_open → done (PR ##{pr_number} merged)"
           )
+          Guild.Retention.trim_decisions_log(thread.id)
 
         {:error, tier, reason} ->
           Logger.warning(

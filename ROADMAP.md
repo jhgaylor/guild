@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- _Nothing in flight._ ADR 0010 + Slice 2 done. Remaining G4: Slice 3 (retention + summarization — ADR 0009/0007 updates, may defer to G5), Slices 4/5 (Slack/Linear adapters — no ADRs, parallelizable), Slice 6 (multi-worker + multi-repo — ADRs 0011–0013). Per [`plan/g4/slice-plan.md`](plan/g4/slice-plan.md).
+- **g4-slice-3** — in flight. Retention (ADR 0009, `Guild.Retention`), summarization (ADR 0007, `Guild.Summarization`), LiveView socket auth (`GuildWeb.OperatorAuth`). Branch: `g4/slice-3-retention-summarization-liveauth`. Brief: [`plan/g4-slice-3/general-purpose-engineer-brief.md`](plan/g4-slice-3/general-purpose-engineer-brief.md).
 
 ## Done
 

@@ -1,30 +1,43 @@
-# 0007 — Context assembly: bounded recency window (Wedge B)
+# 0007 — Context assembly: bounded recency window + summarization (G4 update)
 
-**Status:** Accepted
+**Status:** Accepted (Updated G4)
 
 ## Context
 
-Before each worker decision, Guild assembles a context packet from the thread's history. A thread may accumulate hundreds of events over its lifetime. The context packet must fit in the worker's context window and must not be stale. The question is: how should `Guild.ContextAssembly.build/1` query the thread's event history?
+At G4 fleet scale, threads accumulate enough context notes that the bounded
+recency window (50 events) risks losing important context. The TODO comment
+placed in `Guild.ContextAssembly` is now addressed via a summarization hook.
 
 ## Decision
 
-**Bounded recency window.** `Guild.ContextAssembly.build/1` fetches:
+**Trigger summarization when a thread's `context_notes` count exceeds 50.**
 
-1. The last **N** events on the thread, ordered by timestamp descending, where N is a compile-time constant (initially `50`).
-2. **All** `context_notes` of type `human_instruction`, unconditionally — regardless of age.
+`Guild.Summarization.maybe_summarize/1` is called during each reconcile cycle
+for executing threads. It:
 
-No summarization. No pre-computed rows. No rolling window logic. This is the simplest version that works for Wedge B's scope.
+1. Counts active context notes for the thread.
+2. No-ops if count <= 50.
+3. Over threshold: assembles the thread context via `Guild.ContextAssembly.build/1`,
+   POSTs it to Fountain using the existing HTTP adapter
+   (`Guild.Adapters.Fountain.dispatch_conversation/4` + `observe_conversation/1`),
+   stores the Fountain response as a `ContextNote` with `note_type: "summary"`, and
+   marks all previously unsummarized notes as `note_type: "archived"`.
 
-A `# TODO(summarization): revisit when thread length forces it — i.e., when the bounded window demonstrably loses important context in production` comment is placed in the assembly module to flag the known limitation and prevent it from being forgotten.
+`Guild.ContextAssembly.build/1` is unchanged: it still fetches the last 50 events
+and all `human_instruction` notes unconditionally.
 
 ## Consequences
 
-- Simple to implement and test: one bounded query, one unconditional fetch, one assembly step.
-- No write-path side effects: nothing is updated when a context packet is built.
-- Does **not** add a `summary` column to `threads` — this ADR explicitly defers that column until summarization is designed.
-- Will not scale to long-running threads with large event histories. Acceptable for Wedge B (single short-lived thread). The TODO is a forcing function to address this before G3.
+- Context notes are bounded in size; summarization prevents unbounded accumulation.
+- Human instruction notes are still always included in the context packet.
+- Summarization failures are logged and non-fatal; the reconcile loop continues.
+- No migration required: the `context_notes` table already supports string `note_type`;
+  `summary` and `archived` are added to the application-level allowlist.
 
 ## Alternatives considered
 
-- **Cursor-based pagination with rolling summarization** — rejected for Wedge B: significant implementation complexity; Wedge B's single short-lived thread will never overflow the window, so the complexity has no payoff.
-- **Pre-computed summary rows** (a `summary` column on `threads`, updated on each event insert) — rejected: requires write-path complexity and a migration that adds a column before the shape of a useful summary is understood. Premature optimization; adds accidental coupling between ingestion and context assembly.
+- **Pre-computed summary column on threads** — rejected: write-path coupling before
+  the shape of a useful summary is understood.
+- **Cursor-based pagination** — rejected: significant complexity; summarization is simpler.
+- **Summarize on every note insert** — rejected: unnecessary overhead; threshold-based
+  batching is more efficient.

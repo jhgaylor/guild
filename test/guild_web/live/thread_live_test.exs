@@ -30,4 +30,12 @@ defmodule GuildWeb.ThreadLiveTest do
     assert html =~ "live-test-anchor-456"
     assert html =~ "executing"
   end
+
+  test "unauthenticated live mount is rejected", %{conn: conn, thread: thread} do
+    # Without auth headers the :auth pipeline halts with 401.
+    # The halted conn (no static token) causes LiveViewTest to raise.
+    assert_raise FunctionClauseError, fn ->
+      live(conn, ~p"/threads/#{thread.id}")
+    end
+  end
 end
