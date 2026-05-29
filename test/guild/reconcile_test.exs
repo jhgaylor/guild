@@ -53,22 +53,17 @@ defmodule Guild.ReconcileTest do
   end
 
   describe "pass_a - executing → pr_open" do
-    test "transitions to pr_open when Fountain idle and matching PR found", %{bypass: bypass} do
+    test "transitions to pr_open when a matching PR exists, regardless of worker conv status" do
       thread = insert_thread("executing")
       insert_seed_event(thread.id)
       insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-test")
 
-      # TestAdapter.configure/2 stores in process dict — safe because reconcile_all/0
-      # runs synchronously in the test process (not via GenServer).
+      # No Fountain status mock: reconcile must NOT call get_status. The worker
+      # conv legitimately stays alive after opening its PR, so the PR's
+      # existence — not conv status — drives the transition.
       Guild.GitHub.TestAdapter.configure(:list_pull_requests, {:ok, [
         %{"number" => 42, "html_url" => "https://github.com/owner/test-repo/pull/42", "body" => "Closes #3"}
       ]})
-
-      Bypass.expect_once(bypass, "GET", "/api/conversations/conv-test", fn conn ->
-        conn
-        |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.resp(200, Jason.encode!(%{data: %{status: "idle"}}))
-      end)
 
       :ok = Guild.Reconcile.reconcile_all()
 
@@ -80,24 +75,34 @@ defmodule Guild.ReconcileTest do
       assert artifact.external_id == "42"
     end
 
-    test "no transition when Fountain is still running", %{bypass: bypass} do
+    test "self-heals executing → done in one reconcile when a matching merged PR + merged event exist" do
+      # Reproduces the live scenario: a PR was opened and merged before reconcile
+      # observed it open. The merged event is already ingested; Pass A promotes to
+      # pr_open (matching the merged PR via state: \"all\") and Pass B finishes it.
       thread = insert_thread("executing")
       insert_seed_event(thread.id)
-      insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-running")
+      insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-merged")
 
-      Bypass.expect_once(bypass, "GET", "/api/conversations/conv-running", fn conn ->
-        conn
-        |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.resp(200, Jason.encode!(%{data: %{status: "running"}}))
-      end)
+      Guild.GitHub.TestAdapter.configure(:list_pull_requests, {:ok, [
+        %{"number" => 35, "html_url" => "https://github.com/owner/test-repo/pull/35", "body" => "Closes #3"}
+      ]})
+
+      Repo.insert!(%Event{
+        source: "github",
+        event_type: "pull_request.merged",
+        occurred_at: DateTime.utc_now(),
+        raw_payload: %{"action" => "closed", "pull_request" => %{"merged" => true}},
+        idempotency_key: "pr_merged:35:#{System.unique_integer()}",
+        thread_id: thread.id
+      })
 
       :ok = Guild.Reconcile.reconcile_all()
 
       thread = Repo.get!(Thread, thread.id)
-      assert thread.state == "executing"
+      assert thread.state == "done"
     end
 
-    test "no transition when Fountain idle but no matching PR found", %{bypass: bypass} do
+    test "no transition when no matching PR found" do
       thread = insert_thread("executing")
       insert_seed_event(thread.id)
       insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-no-pr")
@@ -105,12 +110,6 @@ defmodule Guild.ReconcileTest do
       Guild.GitHub.TestAdapter.configure(:list_pull_requests, {:ok, [
         %{"number" => 99, "html_url" => "https://github.com/owner/test-repo/pull/99", "body" => "Unrelated PR"}
       ]})
-
-      Bypass.expect_once(bypass, "GET", "/api/conversations/conv-no-pr", fn conn ->
-        conn
-        |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.resp(200, Jason.encode!(%{data: %{status: "idle"}}))
-      end)
 
       :ok = Guild.Reconcile.reconcile_all()
 

@@ -101,22 +101,14 @@ defmodule Guild.Reconcile do
     end)
   end
 
-  defp reconcile_executing_thread(thread, artifact) do
+  # A worker conversation stays alive after opening its PR (to handle review
+  # feedback), so its Fountain status never reaches :idle on its own. Gating the
+  # transition on conversation status therefore stalls the thread forever. The
+  # existence of a matching PR is the real signal, so we check for it on every
+  # tick regardless of conversation status.
+  defp reconcile_executing_thread(thread, _artifact) do
     Guild.Summarization.maybe_summarize(thread.id)
-    conv_id = artifact.external_id
-
-    case Guild.Adapters.Fountain.get_status(conv_id) do
-      {:ok, :idle} ->
-        check_for_pr(thread)
-
-      {:ok, status} ->
-        Logger.debug("Thread #{thread.id}: Fountain status #{status}, skipping")
-
-      {:error, tier, reason} ->
-        Logger.warning(
-          "Thread #{thread.id}: Fountain get_status error (#{tier}): #{inspect(reason)}"
-        )
-    end
+    check_for_pr(thread)
   end
 
   defp check_for_pr(thread) do
@@ -127,7 +119,9 @@ defmodule Guild.Reconcile do
     else
       issue_number = thread.anchor_id
 
-      case Guild.GitHub.impl().list_pull_requests(repo, state: "open") do
+      # state: "all" so a PR that was opened and merged between reconcile ticks
+      # is still matched (otherwise the thread stalls in executing forever).
+      case Guild.GitHub.impl().list_pull_requests(repo, state: "all") do
         {:ok, prs} ->
           pattern = ~r/(Closes|Fixes) ##{Regex.escape(issue_number)}/i
 
