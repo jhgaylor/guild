@@ -117,25 +117,9 @@ defmodule GuildWeb.WebhookController do
     if already_claimed do
       Logger.info("Thread already claimed for issue #{repo}##{issue_number}, skipping")
     else
-      if Application.get_env(:guild, :claim_async, true) do
-        Task.start(fn ->
-          case Guild.Claiming.claim_issue(repo, issue_number) do
-            {:ok, %{thread: t, fountain_conv_id: id}} ->
-              Logger.info("Claimed issue #{repo}##{issue_number}: thread=#{t.id} conv=#{id}")
-
-            {:error, reason} ->
-              Logger.error("Failed to claim issue #{repo}##{issue_number}: #{inspect(reason)}")
-          end
-        end)
-      else
-        case Guild.Claiming.claim_issue(repo, issue_number) do
-          {:ok, %{thread: t, fountain_conv_id: id}} ->
-            Logger.info("Claimed issue #{repo}##{issue_number}: thread=#{t.id} conv=#{id}")
-
-          {:error, reason} ->
-            Logger.error("Failed to claim issue #{repo}##{issue_number}: #{inspect(reason)}")
-        end
-      end
+      %{"repo" => repo, "issue_number" => issue_number}
+      |> Guild.Workers.ClaimWorker.new()
+      |> Oban.insert()
     end
   end
 
