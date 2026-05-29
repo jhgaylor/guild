@@ -50,6 +50,7 @@ defmodule Guild.MixProject do
       {:lazy_html, ">= 0.1.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.8.3"},
       {:telemetry_metrics, "~> 1.0"},
+      {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
@@ -57,24 +58,7 @@ defmodule Guild.MixProject do
       {:joken, "~> 2.6"},
       {:jose, "~> 1.11"},
       {:bypass, "~> 2.1", only: :test},
-      {:oban, "~> 2.18"},
-      # Pre-compiled rebar3 deps — rebar3 cannot run in this environment.
-      # BEAM files are compiled with erlc and placed in deps/*/ebin.
-      # compile: "true" runs a no-op shell command so mix calls build_symlink_structure,
-      # which symlinks _build/*/lib/*/ebin -> deps/*/ebin (where our beams live).
-      {:mimerl, "~> 1.4", compile: "true", override: true},
-      {:certifi, "~> 2.15", compile: "true", override: true},
-      {:hackney, "~> 1.21", compile: "true", override: true},
-      {:idna, "~> 6.1", compile: "true", override: true},
-      {:metrics, "~> 1.0", compile: "true", override: true},
-      {:parse_trans, "3.4.1", compile: "true", override: true},
-      {:unicode_util_compat, "~> 0.7", compile: "true", override: true},
-      {:telemetry, "~> 1.0", compile: "true", override: true},
-      {:cowlib, "~> 2.13", compile: "true", override: true},
-      {:ranch, "~> 1.8 or ~> 2.1", compile: "true", override: true},
-      {:cowboy, "~> 2.12", compile: "true", override: true},
-      {:cowboy_telemetry, "~> 0.4", compile: "true", override: true},
-      {:telemetry_poller, "~> 1.0", compile: "true", override: true}
+      {:oban, "~> 2.18"}
     ]
   end
 
