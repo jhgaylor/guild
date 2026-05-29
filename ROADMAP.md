@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- G4 Slice 2 — ADR 0010 durable claim queue (PR open, awaiting operator approval)
+- G4 Slice 2 — Durable claim queue (Oban) — implementation in progress on `g4/slice-2-durable-claim-queue`
 
 ## Done
 
