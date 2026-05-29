@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g5-slice-4** — in flight (final G5 slice). Worker-conv lifecycle: Reconcile Pass D terminates Fountain convs on terminal thread state; conv status shown in thread detail. Digest deferred to G6. _(Slice 3 PR #42 merged; CI building → deploy. Slack stays fail-secure-dormant until operator provisions SLACK_SIGNING_SECRET + a /guild slash command.)_
+- **g5-slice-4** — in progress (branch `g5/slice-4-conv-lifecycle`, kicked off 2026-05-29). Worker-conv lifecycle: Reconcile Pass D terminates Fountain convs on terminal thread state; conv status shown in thread detail. Digest deferred to G6. _(Slice 3 PR #42 merged; CI building → deploy. Slack stays fail-secure-dormant until operator provisions SLACK_SIGNING_SECRET + a /guild slash command.)_
 
 ## Done
 

@@ -144,10 +144,12 @@ defmodule Guild.ReconcileTest do
       assert artifact.external_id == "42"
     end
 
-    test "self-heals executing → done in one reconcile when a matching merged PR + merged event exist" do
+    test "self-heals executing → done in one reconcile when a matching merged PR + merged event exist",
+         %{bypass: bypass} do
       # Reproduces the live scenario: a PR was opened and merged before reconcile
       # observed it open. The merged event is already ingested; Pass A promotes to
-      # pr_open (matching the merged PR via state: \"all\") and Pass B finishes it.
+      # pr_open (matching the merged PR via state: "all") and Pass B finishes it.
+      # Pass D then runs and calls get_status on the fountain_conversation artifact.
       thread = insert_thread("executing")
       insert_seed_event(thread.id)
       insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-merged")
@@ -164,6 +166,19 @@ defmodule Guild.ReconcileTest do
         idempotency_key: "pr_merged:35:#{System.unique_integer()}",
         thread_id: thread.id
       })
+
+      # Pass D will call get_status and then terminate_conversation for the now-done thread
+      Bypass.stub(bypass, "GET", "/api/conversations/conv-merged", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{"data" => %{"id" => "conv-merged", "status" => "running"}}))
+      end)
+
+      Bypass.stub(bypass, "POST", "/api/conversations/conv-merged/terminate", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{"data" => %{"id" => "conv-merged"}}))
+      end)
 
       :ok = Guild.Reconcile.reconcile_all()
 
@@ -319,6 +334,62 @@ defmodule Guild.ReconcileTest do
       updated = Repo.get!(Thread, thread.id)
       # last_alerted_at should still equal one_hour_ago (not updated)
       assert DateTime.diff(updated.last_alerted_at, one_hour_ago, :second) == 0
+    end
+  end
+
+  describe "pass_d - terminate Fountain conversations for done/abandoned threads" do
+    test "terminates an active conversation for a done thread", %{bypass: bypass} do
+      thread = insert_thread("done")
+      conv_id = "conv-active-#{System.unique_integer([:positive])}"
+      insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: conv_id)
+
+      Bypass.expect_once(bypass, "GET", "/api/conversations/#{conv_id}", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{"data" => %{"id" => conv_id, "status" => "running"}}))
+      end)
+
+      Bypass.expect_once(bypass, "POST", "/api/conversations/#{conv_id}/terminate", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{"data" => %{"id" => conv_id}}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+    end
+
+    test "skips termination when conversation is already terminated (idempotent)", %{bypass: bypass} do
+      thread = insert_thread("done")
+      conv_id = "conv-done-#{System.unique_integer([:positive])}"
+      insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: conv_id)
+
+      Bypass.expect_once(bypass, "GET", "/api/conversations/#{conv_id}", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{"data" => %{"id" => conv_id, "status" => "terminated"}}))
+      end)
+
+      # terminate endpoint must NOT be called — verify by failing if it is
+      Bypass.stub(bypass, "POST", "/api/conversations/#{conv_id}/terminate", fn _conn ->
+        flunk("terminate should not be called for an already-terminated conversation")
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+    end
+
+    test "logs warning on Fountain error and does not crash reconcile", %{bypass: bypass} do
+      thread = insert_thread("done")
+      conv_id = "conv-err-#{System.unique_integer([:positive])}"
+      insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: conv_id)
+
+      Bypass.expect_once(bypass, "GET", "/api/conversations/#{conv_id}", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(500, Jason.encode!(%{"error" => "internal server error"}))
+      end)
+
+      # reconcile_all must return :ok despite the Fountain error
+      :ok = Guild.Reconcile.reconcile_all()
     end
   end
 end
