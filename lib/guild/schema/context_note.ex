@@ -2,7 +2,7 @@ defmodule Guild.Schema.ContextNote do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @valid_note_types ~w(decision attempt blocker status human_instruction)
+  @valid_note_types ~w(decision attempt blocker status human_instruction summary archived)
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id

@@ -1,32 +1,39 @@
-# 0009 — Decisions log retention policy: retain indefinitely (Wedge B)
+# 0009 — Decisions log retention policy: rolling null beyond 200 (G4 update)
 
-**Status:** Accepted
+**Status:** Accepted (Updated G4)
 
 ## Context
 
-`decisions_log` rows include a `context_snapshot` field — a full copy of the context packet delivered to the worker at decision time. These rows will be the largest in the database by average row size. A retention policy must be chosen before the table is created so the migration does not need to be revisited for operational reasons mid-wedge.
+`decisions_log` rows include a `context_snapshot` field — a full copy of the context
+packet delivered to the worker at decision time. At G4 fleet scale, unbounded growth
+of this field becomes an operational concern. The TODO comment added in G0 is now
+addressed.
 
 ## Decision
 
-**Retain indefinitely for Wedge B.** No archival, no rolling delete, no hash-only strategy. Wedge B processes a single seeded thread; total `decisions_log` volume is negligible and the full audit trail is worth more than any storage savings.
+**Keep full rows for the most recent 200 decisions per thread; null `context_snapshot`
+on older rows while preserving `decision_type`, `params`, `reasoning`, and timestamps.**
 
-A migration-level comment is placed in the `decisions_log` migration file:
+`Guild.Retention.trim_decisions_log/1` is called automatically when a thread reaches
+`:done` state in `Guild.Reconcile`. The function:
 
-```sql
--- TODO(retention): revisit at G3 when fleet scale changes the calculus
-```
+1. Queries `decisions_log` for the given thread, ordered by `id` descending.
+2. Takes the first 200 IDs (the most recent rows).
+3. Updates all remaining rows for that thread, setting `context_snapshot = nil`.
 
-This is a forcing function: it appears in the file that creates the table, so any engineer touching the migration before G3 will see it.
+The full audit trail (action, params, timestamps) is preserved; only the large blob
+field is cleared on older rows.
 
 ## Consequences
 
-- Simplest possible policy; no operational complexity introduced.
-- Full audit trail preserved: every `context_snapshot` is available for debugging, evaluation, and retrospective analysis.
-- `context_snapshot` will grow unboundedly in production fleet use. This is the known deferred risk; the TODO is the explicit commitment to address it before G3.
-- No infrastructure dependency on cold storage (S3 or equivalent) is introduced at this milestone.
+- Storage growth is bounded per thread (200 full rows + unlimited lightweight rows).
+- Audit trail remains: action type, params, and timestamps are always available.
+- The most recent 200 snapshots are kept for active debugging and evaluation.
+- Implemented as a cleanup step at thread completion, so write-path latency is unaffected.
 
 ## Alternatives considered
 
-- **Rolling delete after T days** — rejected: T is unknown without production data. Choosing a number now would be arbitrary and potentially destructive to the audit trail.
-- **Archive to cold storage after N days** — rejected: adds an infrastructure dependency (S3 or equivalent) before we know whether we need it. Premature for Wedge B's volume.
-- **Store hash only after N days** — rejected: loses auditability of the actual context delivered to the worker, which defeats the primary purpose of the decisions log. Forensic value is in the content, not the hash.
+- **Rolling delete after T days** — rejected: destroys the audit trail for old threads.
+- **Archive to cold storage** — rejected: infrastructure dependency not justified at current scale.
+- **Store hash only** — rejected: loses forensic value; content not recoverable.
+- **Trim on every reconcile cycle** — rejected: unnecessary overhead; trimming at completion is sufficient.

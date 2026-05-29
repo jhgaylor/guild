@@ -35,7 +35,10 @@ defmodule GuildWeb.Router do
 
     get "/threads", ThreadController, :index
     get "/decisions", DecisionController, :index
-    live "/threads/:id", ThreadLive, :show
+
+    live_session :authenticated, on_mount: {GuildWeb.OperatorAuth, :require_auth} do
+      live "/threads/:id", ThreadLive, :show
+    end
   end
 
   # Other scopes may use custom stacks.
@@ -44,10 +47,17 @@ defmodule GuildWeb.Router do
   # end
 
   defp operator_auth(conn, _opts) do
-    Plug.BasicAuth.basic_auth(conn,
-      username: System.fetch_env!("OPERATOR_USERNAME"),
-      password: System.fetch_env!("OPERATOR_PASSWORD")
-    )
+    conn =
+      Plug.BasicAuth.basic_auth(conn,
+        username: System.fetch_env!("OPERATOR_USERNAME"),
+        password: System.fetch_env!("OPERATOR_PASSWORD")
+      )
+
+    if conn.halted do
+      conn
+    else
+      Plug.Conn.put_session(conn, :authenticated, true)
+    end
   end
 
   # Enable LiveDashboard in development
