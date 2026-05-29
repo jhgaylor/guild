@@ -31,6 +31,21 @@ defmodule GuildWeb.ThreadLiveTest do
     assert html =~ "executing"
   end
 
+  test "GET /threads/:id renders events section", %{conn: conn, thread: thread} do
+    {:ok, _view, html} = conn |> with_auth() |> live(~p"/threads/#{thread.id}")
+    assert html =~ "Events"
+  end
+
+  test "GET /threads/:id renders artifacts section", %{conn: conn, thread: thread} do
+    {:ok, _view, html} = conn |> with_auth() |> live(~p"/threads/#{thread.id}")
+    assert html =~ "Artifacts"
+  end
+
+  test "GET /threads/:id renders context_notes section", %{conn: conn, thread: thread} do
+    {:ok, _view, html} = conn |> with_auth() |> live(~p"/threads/#{thread.id}")
+    assert html =~ "Context Notes"
+  end
+
   test "unauthenticated live mount is rejected", %{conn: conn, thread: thread} do
     # Without auth headers the :auth pipeline halts with 401.
     # The halted conn (no static token) causes LiveViewTest to raise.

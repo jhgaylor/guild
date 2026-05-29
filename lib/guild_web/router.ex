@@ -1,5 +1,6 @@
 defmodule GuildWeb.Router do
   use GuildWeb, :router
+  import Oban.Web.Router
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -35,6 +36,8 @@ defmodule GuildWeb.Router do
 
     get "/threads", ThreadController, :index
     get "/decisions", DecisionController, :index
+
+    oban_dashboard "/jobs"
 
     live_session :authenticated, on_mount: {GuildWeb.OperatorAuth, :require_auth} do
       live "/threads/:id", ThreadLive, :show
