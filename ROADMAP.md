@@ -8,10 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g4-slice-3** — in flight. Retention (ADR 0009, `Guild.Retention`), summarization (ADR 0007, `Guild.Summarization`), LiveView socket auth (`GuildWeb.OperatorAuth`). Branch: `g4/slice-3-retention-summarization-liveauth`. Brief: [`plan/g4-slice-3/general-purpose-engineer-brief.md`](plan/g4-slice-3/general-purpose-engineer-brief.md).
+- _Nothing in flight._ Driver sweeping remaining G4: Slices 4/5 (Slack/Linear adapters) next, then Slice 6 (multi-worker/multi-repo: ADRs 0011–0013 + impl). Per [`plan/g4/slice-plan.md`](plan/g4/slice-plan.md).
 
 ## Done
 
+- **g4-slice-3** — PR #30 merged (339b326). Retention (ADR 0009: keep recent 200 decisions/thread, null `context_snapshot` on older rows — `Guild.Retention`), summarization (ADR 0007: summarize via Fountain past 50-note threshold, archive superseded notes — `Guild.Summarization`), and LiveView socket auth (`GuildWeb.OperatorAuth` `on_mount` + `live_session` closes the `/live` WS bypass; BasicAuth now sets a session flag). 261 tests green. Driver dropped an env-specific rebar3 `mix.exs` hack the worker had injected (would break clean/fork builds) before merge.
 - **g4-slice-2** — PR #29 merged (4934eac). Durable claim queue via Oban (ADR 0010): `ClaimWorker` on `:claims` queue, args-unique, retry-with-backoff; webhook now enqueues via `Oban.insert` and returns 200 immediately (replaced `Task.start`); Slice-1 advisory lock retained as second-layer guard. 251 tests green. Driver merged.
 - **g4-adr-0010** — PR #28 merged (56062b7). Durable claim queue ADR: Oban accepted over Broadway (over-engineered for low volume) and hand-rolled (recreates solved problems). Operator-approved.
 - **g4-slice-1** — PR #27 merged (e79c9c6). Race fix (advisory-lock `claim_issue`), UI BasicAuth on `/threads`,`/decisions`,`/threads/:id`, `SECRET_KEY_BASE` fail-fast. Follow-up fix (9a3b5e2) moved auth creds to a request-time function plug — original compile-time `Plug.BasicAuth` opts baked `nil` into the release router. 248 tests green. Driver merged.
