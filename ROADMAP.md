@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- _Nothing in flight._ Last G4 work: Slice 6 (multi-worker + multi-repo) — 6a (ADRs 0011–0013 + schema), then 6b (impl). Per [`plan/g4/slice-plan.md`](plan/g4/slice-plan.md).
+- **G4 Slice 6a** — multi-worker/multi-repo ADRs (0011–0013) + schema migrations (workers, repos, threads.owner). Branch: `g4/slice-6a-multiworker-adrs-schema`. No runtime behavior change. Slices 4+5 merged as PR #31.
 
 ## Done
 
