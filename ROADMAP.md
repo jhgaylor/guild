@@ -8,10 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g5-slice-2** — implementation in progress. Stuck/failed surfacing + `owner` release per ADR 0014: Reconcile Pass C (executing>2h / pr_open>48h → Slack alert, deduped via `last_alerted_at` + 6h cooldown), clear `owner` on terminal state, stuck badges in UI. Branch: `g5/slice-2-stuck-surfacing`. Brief: `plan/g5-slice-2/general-purpose-engineer-brief.md`.
+- **g5-slice-3 ADR** — captain-picard drafting ADR 0015 (inbound Slack human-in-the-loop). _(Slice 2 PR #40 merged; CI building → deploy.)_
 
 ## Done
 
+- **g5-slice-2** — PR #40 merged (2ba071e). Stuck/failed surfacing + `owner` release (ADR 0014): Reconcile Pass C alerts on `:executing`>2h / `:pr_open`>48h via Slack (deduped by `last_alerted_at` + 6h cooldown); `owner` cleared on terminal state in `Meta.update_thread_state`; stuck badge on index + banner on detail. `last_alerted_at` migration. 306 tests green. Driver stripped a stray `docs/superpowers/` scratch plan the worker committed.
 - **g5-adr-0014** — PR #39 merged (7e6f247). Stuck-thread detection (Reconcile Pass C; `:executing`>2h / `:pr_open`>48h via `updated_at`), Slack alert deduped by `last_alerted_at` + 6h cooldown, `owner` cleared on terminal state. `updated_at`-as-state-age proxy accepted (state_entered_at deferred). Driver approved.
 - **g5-slice-1** — PR #38 merged (52d06f4). Oban Web dashboard mounted at `/jobs` inside the `:auth` pipeline (`oban_web` 2.12.5, free from public hex). Thread detail (`/threads/:id`) already rendered owner + Events/Context Notes/Decisions/Artifacts (with PR + Fountain conv links) from G2.5, so legibility content pre-existed — worker added the queue view. 301 tests green. Deviations (deferred polish): sectioned view rather than a single *interleaved* timeline; no `context_snapshot`-nil indicator. Driver scoped the `/jobs` test to the auth gate (full render needs Oban.Met, absent under `:inline`).
 - **g5-slice-plan** — PR #37 merged (ff8c537). G5 (Operability & trust) decomposed into 4 slices: (1) Oban Web + thread timeline, (2) stuck/failed surfacing + owner release [ADR 0014], (3) Slack human-in-the-loop [ADR 0015], (4) worker-conv lifecycle + digest. Oban Web chosen over custom view. Driver approved.
