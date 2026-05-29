@@ -9,6 +9,10 @@ defmodule Guild.Reconcile do
   alias Guild.Schema.Artifact
   alias Guild.Primitives.Meta
 
+  @executing_stuck_after_ms 2 * 3_600_000
+  @pr_open_stuck_after_ms 48 * 3_600_000
+  @alert_cooldown_ms 6 * 3_600_000
+
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
 
   def init(_opts) do
@@ -78,6 +82,7 @@ defmodule Guild.Reconcile do
   defp do_reconcile do
     pass_a()
     pass_b()
+    pass_c()
   end
 
   # Pass A: executing → pr_open
@@ -254,5 +259,39 @@ defmodule Guild.Reconcile do
           )
       end
     end
+  end
+
+  # Pass C: alert on stuck threads (executing too long or pr_open too long)
+  defp pass_c do
+    now = DateTime.utc_now()
+    cooldown_cutoff = DateTime.add(now, -@alert_cooldown_ms, :millisecond)
+
+    executing_cutoff = DateTime.add(now, -@executing_stuck_after_ms, :millisecond)
+    pr_open_cutoff = DateTime.add(now, -@pr_open_stuck_after_ms, :millisecond)
+
+    stuck_threads =
+      Repo.all(
+        from t in Thread,
+          where:
+            (t.state == "executing" and t.updated_at < ^executing_cutoff) or
+              (t.state == "pr_open" and t.updated_at < ^pr_open_cutoff),
+          where: is_nil(t.last_alerted_at) or t.last_alerted_at < ^cooldown_cutoff
+      )
+
+    Enum.each(stuck_threads, fn thread ->
+      try do
+        age_seconds = DateTime.diff(now, thread.updated_at)
+        age_hours = div(age_seconds, 3600)
+
+        Guild.Adapters.Slack.post_message(
+          "Thread ##{thread.id} appears stuck: state=#{thread.state}, age=#{age_hours}h"
+        )
+
+        Repo.update!(Thread.changeset(thread, %{last_alerted_at: now}))
+      rescue
+        e ->
+          Logger.warning("Reconcile pass C error for thread #{thread.id}: #{inspect(e)}")
+      end
+    end)
   end
 end

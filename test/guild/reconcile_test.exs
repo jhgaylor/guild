@@ -143,4 +143,113 @@ defmodule Guild.ReconcileTest do
       assert thread.state == "done"
     end
   end
+
+  describe "pass_b - owner release on done" do
+    test "clears owner when thread transitions to done" do
+      thread =
+        %Thread{}
+        |> Thread.changeset(%{
+          anchor_type: "github_issue",
+          anchor_id: "99",
+          state: "pr_open",
+          owner: "worker-agent-1"
+        })
+        |> Repo.insert!()
+
+      insert_artifact(thread.id, "pull_request",
+        source: "github",
+        external_id: "77",
+        url: "https://github.com/owner/test-repo/pull/77"
+      )
+
+      Repo.insert!(%Event{
+        source: "github",
+        event_type: "pull_request.merged",
+        occurred_at: DateTime.utc_now(),
+        raw_payload: %{"action" => "closed", "pull_request" => %{"merged" => true}},
+        idempotency_key: "pr_merged:77:#{System.unique_integer()}",
+        thread_id: thread.id
+      })
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      thread = Repo.get!(Thread, thread.id)
+      assert thread.state == "done"
+      assert thread.owner == nil
+    end
+  end
+
+  describe "pass_c - stuck thread alerting" do
+    setup %{bypass: _fountain_bypass} do
+      slack_bypass = Bypass.open()
+
+      Application.put_env(:guild, :slack_bot_token, "xoxb-test")
+      Application.put_env(:guild, :slack_channel_id, "C_TEST")
+
+      Application.put_env(
+        :guild,
+        :slack_api_url,
+        "http://localhost:#{slack_bypass.port}/api/chat.postMessage"
+      )
+
+      on_exit(fn ->
+        Application.delete_env(:guild, :slack_bot_token)
+        Application.delete_env(:guild, :slack_channel_id)
+        Application.delete_env(:guild, :slack_api_url)
+      end)
+
+      {:ok, slack_bypass: slack_bypass}
+    end
+
+    test "posts Slack alert and sets last_alerted_at for over-threshold :executing thread",
+         %{slack_bypass: slack_bypass} do
+      thread = insert_thread("executing")
+
+      # Set updated_at to 3 hours ago (exceeds 2-hour executing threshold)
+      past = DateTime.add(DateTime.utc_now(), -3 * 3600, :second)
+      Repo.update_all(from(t in Thread, where: t.id == ^thread.id), set: [updated_at: past])
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        assert decoded["text"] =~ thread.id
+        assert decoded["text"] =~ "stuck"
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      updated = Repo.get!(Thread, thread.id)
+      assert updated.last_alerted_at != nil
+    end
+
+    test "skips re-alert when last_alerted_at is within cooldown", %{slack_bypass: slack_bypass} do
+      thread = insert_thread("executing")
+
+      # 3 hours ago — exceeds threshold
+      past = DateTime.add(DateTime.utc_now(), -3 * 3600, :second)
+      # 1 hour ago — within 6-hour cooldown
+      one_hour_ago = DateTime.add(DateTime.utc_now(), -1 * 3600, :second) |> DateTime.truncate(:second)
+
+      Repo.update_all(
+        from(t in Thread, where: t.id == ^thread.id),
+        set: [updated_at: past, last_alerted_at: one_hour_ago]
+      )
+
+      # Pass C must not call Slack at all — thread is filtered by cooldown query
+      Bypass.stub(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        flunk("Slack should not be called during cooldown period")
+        Plug.Conn.resp(conn, 200, Jason.encode!(%{ok: true}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      updated = Repo.get!(Thread, thread.id)
+      # last_alerted_at should still equal one_hour_ago (not updated)
+      assert DateTime.diff(updated.last_alerted_at, one_hour_ago, :second) == 0
+    end
+  end
 end

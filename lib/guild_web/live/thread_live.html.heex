@@ -1,4 +1,10 @@
 <div class="container">
+  <%= if @stuck? do %>
+    <div class="alert alert--warning" style="margin-bottom: 1rem; padding: 0.75rem 1rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+      <strong>Warning:</strong> This thread appears stuck — state <code><%= @thread.state %></code> has not changed in over <%= if @thread.state == "executing", do: "2 hours", else: "48 hours" %>.
+    </div>
+  <% end %>
+
   <h1 class="page-title">
     <%= GuildWeb.Format.anchor_label(@thread) %>
     <span class={"badge badge--#{@thread.state}"} style="margin-left: 0.75rem; font-size: 0.6em; vertical-align: middle;">
