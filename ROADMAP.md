@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g5-slice-3 ADR** — captain-picard drafting ADR 0015 (inbound Slack human-in-the-loop). _(Slice 2 PR #40 merged; CI building → deploy.)_
+- **g5-slice-3 ADR** — G5 Slice 3 — ADR 0015 inbound Slack control (PR open, awaiting driver approval)
 
 ## Done
 
