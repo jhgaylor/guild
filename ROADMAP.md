@@ -8,9 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g4-slice-6b** — in flight. Wiring multi-worker/multi-repo behavior per ADRs 0011–0013: repo→worker routing in webhook, CAS on `threads.owner` in ClaimWorker, per-worker creds lookup, auto-seed on release. Branch: `g4/slice-6b-multiworker-impl`. Last G4 item.
+- _Nothing in flight._ **G4 complete** (all 6 slices merged 2026-05-29). See Gated → G4.
 
 ## Done
+
+- **g4-slice-6b** — PR #33 merged (a9c5f01). Multi-worker/multi-repo wiring per ADRs 0011–0013: webhook routes by `repos` table → `worker_id` (unconfigured/disabled repos logged + ignored); `ClaimWorker` threads `worker_id` into `Guild.Claiming`, which CAS-claims `threads.owner` inside the advisory-lock txn (0 rows → `{:cancel, :already_claimed}`); Fountain dispatch resolves per-worker `fountain_agent_id`/`vault_id` from the `workers` table (env fallback). Driver added `Guild.Release.seed()` to the Dockerfile entrypoint (was defined but never invoked — strict routing would otherwise drop all webhooks on a fresh deploy). 296 tests green; clean from-scratch build verified.
 
 - **g4-slice-6a** — PR #32 merged (b6a7fcb). Multi-worker/multi-repo ADRs accepted: 0011 (arbitration = advisory lock + optimistic CAS on `threads.owner`), 0012 (per-worker creds via a `workers` table; env vars become seed values), 0013 (multi-repo via a `repos` routing table, single deployment). Schemas `Guild.Schema.Worker`/`Repo` + migrations + `seeds.exs` (default worker/repo from env). Schema/design only, no behavior change. 287 tests green.
 
@@ -40,7 +42,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Next
 
-- **G4 — hardening + breadth for unattended operation.** Framed in [`plan/g4-framing/framing.md`](plan/g4-framing/framing.md). Eight items across correctness (duplicate-dispatch race), operability (auth, SECRET_KEY_BASE Secret, webhook retries), maturity (decisions_log retention, context summarization), and breadth (Linear/Slack adapters, multi-worker + multi-repo). Suggested execution order in the framing doc; first slice = race fix + auth + SECRET_KEY_BASE. Driver dispatches captain-picard to write `plan/g4/slice-plan.md`.
+- **G5 (not yet framed).** Carry-over follow-ups surfaced during G4: wire the optional Linear `:executing → In Progress` transition (helper exists, unused); `threads.owner` release semantics (cleared on terminal state / worker restart — currently set-and-leave); Oban Web UI for operator job visibility; bidirectional adapter sync (Linear/Slack → Guild events). Frame these into a G5 scope doc before dispatching.
 
 ## Gated
 
@@ -48,4 +50,4 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 - **G1** — CLOSED. ADRs 0005–0009 merged (PR #4, 73e4155).
 - **G2** — CLOSED. Worker shipped PR #14 against issue #3, merged 2026-05-19.
 - **G3** — CLOSED 2026-05-24. Self-hosting cutover: integration test + live webhook pipeline merged. Live-fire verified 2026-05-24: issue #24 → PR #25 (LICENSE) shipped autonomously and merged.
-- **G4** — hardening + breadth for unattended operation. See [`plan/g4-framing/framing.md`](plan/g4-framing/framing.md). Closes when a non-driver human can stand up their own Guild instance and watch it ship a PR autonomously, with operator UI behind auth and worker runtime durable across pod restarts.
+- **G4** — CLOSED 2026-05-29. Hardening + breadth for unattended operation; all 8 framing items shipped across 6 slices (PRs #27–#33): (1) duplicate-dispatch race — advisory lock + `threads.owner` CAS; (2) operator-UI auth — BasicAuth + LiveView socket `on_mount`; (3) `SECRET_KEY_BASE` from Secret; (4) durable claim queue — Oban (ADR 0010); (5) decisions_log retention + (6) context summarization (ADRs 0009/0007); (7) Slack + Linear adapters; (8) multi-worker + multi-repo — `workers`/`repos` tables, per-worker creds, repo→worker routing (ADRs 0011–0013). Operator UI behind auth ✓, worker runtime durable across restarts (Oban) ✓, fork-and-configure path via env-seeded `workers`/`repos` ✓. Clean from-scratch build green (296 tests). Carry-overs → G5 (see Next).
