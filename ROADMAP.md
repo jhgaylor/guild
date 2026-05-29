@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g5-slice-1 deploy** — PR #38 merged; CI building, then rollout + live-verify `/jobs` render (the authenticated Oban Web dashboard render isn't unit-testable under `:inline`, so confirmed live). Then Slice 2.
+- **g5-slice-2 ADR** — captain-picard drafting ADR 0014 (stuck-thread thresholds + notify policy) for Slice 2. ADR-first; driver approves before implementation. _(Slice 1 deployed + live-verified 2026-05-29: `/jobs` 401→200, Oban Web dashboard renders.)_
 
 ## Done
 
