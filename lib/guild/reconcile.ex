@@ -246,7 +246,11 @@ defmodule Guild.Reconcile do
             "Thread ##{thread.id}: :done"
           )
 
-          Guild.Adapters.Linear.update_issue(thread.id, %{stateId: "done"})
+          if thread.linear_issue_id do
+            Guild.Adapters.Linear.update_issue(thread.linear_issue_id, %{
+              stateId: Guild.Adapters.Linear.state_id(:done)
+            })
+          end
 
           Guild.Retention.trim_decisions_log(thread.id)
 

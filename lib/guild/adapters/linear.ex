@@ -24,6 +24,25 @@ defmodule Guild.Adapters.Linear do
     not is_nil(api_key()) and not is_nil(team_id())
   end
 
+  defp state_id_in_progress do
+    Application.get_env(:guild, :linear_state_in_progress_id) ||
+      System.get_env("LINEAR_STATE_IN_PROGRESS_ID")
+  end
+
+  defp state_id_done do
+    Application.get_env(:guild, :linear_state_done_id) ||
+      System.get_env("LINEAR_STATE_DONE_ID")
+  end
+
+  @doc """
+  Returns the configured Linear workflow state UUID for the given state atom,
+  or nil if the env var is not set.
+
+  Supported states: :in_progress, :done
+  """
+  def state_id(:in_progress), do: state_id_in_progress()
+  def state_id(:done), do: state_id_done()
+
   defp api_url do
     Application.get_env(:guild, :linear_api_url, @linear_api_url)
   end
@@ -131,6 +150,8 @@ defmodule Guild.Adapters.Linear do
       input =
         attrs
         |> Enum.reduce(%{}, fn
+          {:stateId, nil}, acc -> acc
+          {"stateId", nil}, acc -> acc
           {:stateId, v}, acc -> Map.put(acc, :stateId, v)
           {"stateId", v}, acc -> Map.put(acc, :stateId, v)
           {:title, v}, acc -> Map.put(acc, :title, v)
@@ -139,6 +160,10 @@ defmodule Guild.Adapters.Linear do
           {"description", v}, acc -> Map.put(acc, :description, v)
           _, acc -> acc
         end)
+
+      if map_size(input) == 0 do
+        {:ok, :skipped}
+      else
 
       query = """
       mutation UpdateIssue($id: String!, $input: IssueUpdateInput!) {
@@ -167,6 +192,7 @@ defmodule Guild.Adapters.Linear do
 
         error ->
           error
+      end
       end
     end
   end

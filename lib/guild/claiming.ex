@@ -32,12 +32,17 @@ defmodule Guild.Claiming do
          {:ok, thread} <- transition_to_executing(thread) do
       issue_title = Map.get(issue, "title", "GitHub Issue ##{issue_number} on #{repo}")
 
-      Guild.Adapters.Linear.create_issue(%{
-        title: issue_title,
-        description: "Tracking thread ##{thread.id} for #{repo}##{issue_number}"
-      })
+      thread =
+        case Guild.Adapters.Linear.create_issue(%{
+               title: issue_title,
+               description: "Tracking thread ##{thread.id} for #{repo}##{issue_number}"
+             }) do
+          {:ok, %{id: linear_id}} ->
+            Repo.update!(Thread.changeset(thread, %{linear_issue_id: linear_id}))
 
-      Guild.Adapters.Linear.update_issue(thread.id, %{stateId: "in_progress"})
+          _ ->
+            thread
+        end
 
       {:ok, %{thread: thread, fountain_conv_id: conv_id}}
     else

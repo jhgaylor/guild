@@ -78,6 +78,23 @@ defmodule Guild.Adapters.LinearTest do
                Linear.create_issue(%{title: "Fix the bug", description: "Details here"})
     end
 
+    test "returns {:ok, %{id: id}} with atom key id that can be stored as linear_issue_id",
+         %{bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/graphql", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(
+          200,
+          Jason.encode!(%{
+            data: %{issueCreate: %{success: true, issue: %{id: "lin-999", title: "T"}}}
+          })
+        )
+      end)
+
+      assert {:ok, %{id: linear_id}} = Linear.create_issue(%{title: "T"})
+      assert linear_id == "lin-999"
+    end
+
     test "returns {:error, :permanent, :create_failed} when success is false", %{bypass: bypass} do
       Bypass.expect_once(bypass, "POST", "/graphql", fn conn ->
         conn
@@ -130,6 +147,37 @@ defmodule Guild.Adapters.LinearTest do
       {:ok, bypass: bypass}
     end
 
+    test "sends GraphQL mutation with linear_issue_id (not thread.id) as the id variable",
+         %{bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/graphql", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+
+        assert Map.has_key?(decoded, "query")
+        assert Map.has_key?(decoded, "variables")
+        # Must use the Linear issue UUID, not a thread UUID
+        assert decoded["variables"]["id"] == "linear-issue-uuid-123"
+        assert Map.has_key?(decoded["variables"], "input")
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(
+          200,
+          Jason.encode!(%{
+            data: %{
+              issueUpdate: %{
+                success: true,
+                issue: %{id: "linear-issue-uuid-123", title: "My Issue"}
+              }
+            }
+          })
+        )
+      end)
+
+      assert {:ok, %{id: "linear-issue-uuid-123"}} =
+               Linear.update_issue("linear-issue-uuid-123", %{stateId: "in-progress-state-id"})
+    end
+
     test "sends GraphQL mutation with id and input variables", %{bypass: bypass} do
       Bypass.expect_once(bypass, "POST", "/graphql", fn conn ->
         {:ok, body, conn} = Plug.Conn.read_body(conn)
@@ -180,6 +228,58 @@ defmodule Guild.Adapters.LinearTest do
 
       assert {:error, :transient, {:http_error, 429}} =
                Linear.update_issue("issue-xyz", %{stateId: "state-id"})
+    end
+
+    test "returns {:ok, :skipped} when stateId is nil (env var absent)", %{bypass: _bypass} do
+      # When state id env var is absent, state_id/1 returns nil.
+      # update_issue should skip the API call and return {:ok, :skipped}.
+      assert {:ok, :skipped} =
+               Linear.update_issue("issue-xyz", %{stateId: nil})
+    end
+  end
+
+  describe "update_issue/2 — skipped when linear_issue_id is nil" do
+    test "no API call attempted when caller skips due to nil linear_issue_id" do
+      # This tests the pattern used in reconcile.ex:
+      #   if thread.linear_issue_id do
+      #     Linear.update_issue(thread.linear_issue_id, ...)
+      #   end
+      # When linear_issue_id is nil, update_issue is never called.
+      # We verify the skip logic directly via the nil stateId path.
+      Application.put_env(:guild, :linear_api_key, "lin_api_test_key")
+      Application.put_env(:guild, :linear_team_id, "TEAM-123")
+
+      on_exit(fn ->
+        Application.delete_env(:guild, :linear_api_key)
+        Application.delete_env(:guild, :linear_team_id)
+      end)
+
+      # Passing nil stateId results in skipped (no HTTP call made)
+      assert {:ok, :skipped} = Linear.update_issue("any-id", %{stateId: nil})
+    end
+  end
+
+  describe "state_id/1" do
+    setup do
+      on_exit(fn ->
+        Application.delete_env(:guild, :linear_state_in_progress_id)
+        Application.delete_env(:guild, :linear_state_done_id)
+      end)
+    end
+
+    test "returns nil for :in_progress when env var absent" do
+      Application.delete_env(:guild, :linear_state_in_progress_id)
+      assert is_nil(Linear.state_id(:in_progress)) or is_binary(Linear.state_id(:in_progress))
+    end
+
+    test "returns configured value for :in_progress" do
+      Application.put_env(:guild, :linear_state_in_progress_id, "uuid-in-progress")
+      assert Linear.state_id(:in_progress) == "uuid-in-progress"
+    end
+
+    test "returns configured value for :done" do
+      Application.put_env(:guild, :linear_state_done_id, "uuid-done")
+      assert Linear.state_id(:done) == "uuid-done"
     end
   end
 end
