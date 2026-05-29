@@ -13,6 +13,7 @@ defmodule Guild.Application do
       {Guild.Reconcile, []},
       {DNSCluster, query: Application.get_env(:guild, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Guild.PubSub},
+      {Oban, Application.fetch_env!(:guild, Oban)},
       # Start a worker by calling: Guild.Worker.start_link(arg)
       # {Guild.Worker, arg},
       # Start to serve requests, typically the last entry
