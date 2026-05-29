@@ -8,10 +8,12 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- G4 Slice 2 — Durable claim queue (Oban) — implementation in progress on `g4/slice-2-durable-claim-queue`
+- _Nothing in flight._ ADR 0010 + Slice 2 done. Remaining G4: Slice 3 (retention + summarization — ADR 0009/0007 updates, may defer to G5), Slices 4/5 (Slack/Linear adapters — no ADRs, parallelizable), Slice 6 (multi-worker + multi-repo — ADRs 0011–0013). Per [`plan/g4/slice-plan.md`](plan/g4/slice-plan.md).
 
 ## Done
 
+- **g4-slice-2** — PR #29 merged (4934eac). Durable claim queue via Oban (ADR 0010): `ClaimWorker` on `:claims` queue, args-unique, retry-with-backoff; webhook now enqueues via `Oban.insert` and returns 200 immediately (replaced `Task.start`); Slice-1 advisory lock retained as second-layer guard. 251 tests green. Driver merged.
+- **g4-adr-0010** — PR #28 merged (56062b7). Durable claim queue ADR: Oban accepted over Broadway (over-engineered for low volume) and hand-rolled (recreates solved problems). Operator-approved.
 - **g4-slice-1** — PR #27 merged (e79c9c6). Race fix (advisory-lock `claim_issue`), UI BasicAuth on `/threads`,`/decisions`,`/threads/:id`, `SECRET_KEY_BASE` fail-fast. Follow-up fix (9a3b5e2) moved auth creds to a request-time function plug — original compile-time `Plug.BasicAuth` opts baked `nil` into the release router. 248 tests green. Driver merged.
 - **g4-slice-plan** — PR #26 merged (4aaa848). Six slices covering all 8 G4 framing items; ADR stubs 0010–0013 (Draft). Driver approved plan as-is.
 
