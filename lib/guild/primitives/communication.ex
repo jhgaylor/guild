@@ -25,13 +25,13 @@ defmodule Guild.Primitives.Communication do
     end
   end
 
-  @doc "Reply in a Slack thread. Not yet configured."
-  def reply_in_thread(_channel, _thread_ts, _body) do
-    {:error, :permanent, :not_configured}
+  @doc "Reply in a Slack thread. Routes through Guild.Adapters.Slack."
+  def reply_in_thread(channel, _thread_ts, body) do
+    Guild.Adapters.Slack.post_message(channel, body)
   end
 
-  @doc "Post a message to a Slack channel. Not yet configured."
-  def post_to_channel(_channel, _body) do
-    {:error, :permanent, :not_configured}
+  @doc "Post a message to a Slack channel. Routes through Guild.Adapters.Slack."
+  def post_to_channel(channel, body) do
+    Guild.Adapters.Slack.post_message(channel, body)
   end
 end
