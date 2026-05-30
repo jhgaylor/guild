@@ -101,11 +101,19 @@ defmodule GuildWeb.SlackController do
   defp dispatch_event(conn, %{"type" => "event_callback", "event" => event} = params) do
     event_type = Map.get(event, "type", "unknown")
 
-    # For message replies, resolve thread_id before recording (ADR 0016 + association).
+    # Resolve work thread ONCE per event — used for both the audit Event row
+    # (so reactions/messages associated to a work thread show on /threads/:id)
+    # and for any state-driving handler below (e.g. stop_sign → hold).
     thread_id =
       case event do
         %{"type" => "message", "channel" => channel, "ts" => ts, "thread_ts" => thread_ts} ->
           case resolve_work_thread(channel, ts, thread_ts) do
+            {:ok, tid} -> tid
+            :not_found -> nil
+          end
+
+        %{"type" => "reaction_added", "item" => %{"type" => "message", "channel" => channel, "ts" => item_ts} = item} ->
+          case resolve_work_thread(channel, item_ts, Map.get(item, "thread_ts")) do
             {:ok, tid} -> tid
             :not_found -> nil
           end
@@ -119,23 +127,17 @@ defmodule GuildWeb.SlackController do
 
     # Then optionally drive state.
     case event do
-      %{
-        "type" => "reaction_added",
-        "reaction" => "stop_sign",
-        "item" => %{"type" => "message", "channel" => channel, "ts" => item_ts}
-      } ->
-        item_thread_ts = get_in(event, ["item", "thread_ts"])
+      %{"type" => "reaction_added", "reaction" => "stop_sign", "item" => %{"type" => "message"}} ->
+        case thread_id do
+          nil ->
+            Logger.debug("SlackController.events: reaction_added stop_sign on non-Guild message, no-op")
+            :ok
 
-        case resolve_work_thread(channel, item_ts, item_thread_ts) do
-          {:ok, thread_id} ->
-            case Guild.Control.hold(thread_id) do
+          tid ->
+            case Guild.Control.hold(tid) do
               {:ok, _} -> :ok
               {:error, reason} -> Logger.warning("SlackController.events: hold error: #{inspect(reason)}")
             end
-
-          :not_found ->
-            Logger.debug("SlackController.events: reaction_added stop_sign on non-Guild message, no-op")
-            :ok
         end
 
       _ ->
