@@ -117,5 +117,55 @@ defmodule Guild.Adapters.SlackTest do
 
       assert {:error, :permanent, {:http_error, 403}} = Slack.post_message("C123", "test")
     end
+
+    test "includes blocks in payload when opts[:blocks] is given", %{bypass: bypass} do
+      blocks = [
+        %{type: "section", text: %{type: "mrkdwn", text: "Hello"}},
+        %{
+          type: "actions",
+          elements: [
+            %{type: "button", text: %{type: "plain_text", text: "Hold"}, action_id: "guild_hold", value: "42"}
+          ]
+        }
+      ]
+
+      Bypass.expect_once(bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+
+        assert decoded["channel"] == "C123"
+        assert decoded["text"] == "some text"
+        assert is_list(decoded["blocks"])
+        assert length(decoded["blocks"]) == 2
+
+        action_ids =
+          decoded["blocks"]
+          |> Enum.filter(&(&1["type"] == "actions"))
+          |> Enum.flat_map(& &1["elements"])
+          |> Enum.map(& &1["action_id"])
+
+        assert "guild_hold" in action_ids
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true, ts: "12345.6789"}))
+      end)
+
+      assert {:ok, %{"ok" => true}} = Slack.post_message("C123", "some text", blocks: blocks)
+    end
+
+    test "omits blocks key when opts is empty", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        refute Map.has_key?(decoded, "blocks")
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true}))
+      end)
+
+      assert {:ok, _} = Slack.post_message("C123", "no blocks here")
+    end
   end
 end

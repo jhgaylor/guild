@@ -64,6 +64,124 @@ defmodule Guild.ReconcileTest do
     thread
   end
 
+  describe "pass_a Slack blocks — executing → pr_open" do
+    setup %{bypass: _fountain_bypass} do
+      slack_bypass = Bypass.open()
+
+      Application.put_env(:guild, :slack_bot_token, "xoxb-test")
+      Application.put_env(:guild, :slack_channel_id, "C_TEST")
+      Application.put_env(:guild, :slack_api_url, "http://localhost:#{slack_bypass.port}/api/chat.postMessage")
+
+      on_exit(fn ->
+        Application.delete_env(:guild, :slack_bot_token)
+        Application.delete_env(:guild, :slack_channel_id)
+        Application.delete_env(:guild, :slack_api_url)
+      end)
+
+      {:ok, slack_bypass: slack_bypass}
+    end
+
+    test "pass A Slack message includes guild_hold and guild_abandon action_ids", %{slack_bypass: slack_bypass} do
+      thread = insert_thread("executing")
+      insert_seed_event(thread.id)
+      insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-blocks-a")
+
+      Guild.GitHub.TestAdapter.configure(:list_pull_requests, {:ok, [
+        %{"number" => 55, "html_url" => "https://github.com/owner/test-repo/pull/55", "body" => "Closes #3"}
+      ]})
+
+      received = Agent.start_link(fn -> nil end) |> elem(1)
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        Agent.update(received, fn _ -> decoded end)
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      msg = Agent.get(received, & &1)
+      assert msg != nil
+      assert is_list(msg["blocks"])
+
+      action_ids =
+        msg["blocks"]
+        |> Enum.filter(&(&1["type"] == "actions"))
+        |> Enum.flat_map(& &1["elements"])
+        |> Enum.map(& &1["action_id"])
+
+      assert "guild_hold" in action_ids
+      assert "guild_abandon" in action_ids
+    end
+  end
+
+  describe "pass_b Slack blocks — pr_open → done" do
+    setup %{bypass: _fountain_bypass} do
+      slack_bypass = Bypass.open()
+
+      Application.put_env(:guild, :slack_bot_token, "xoxb-test")
+      Application.put_env(:guild, :slack_channel_id, "C_TEST")
+      Application.put_env(:guild, :slack_api_url, "http://localhost:#{slack_bypass.port}/api/chat.postMessage")
+
+      on_exit(fn ->
+        Application.delete_env(:guild, :slack_bot_token)
+        Application.delete_env(:guild, :slack_channel_id)
+        Application.delete_env(:guild, :slack_api_url)
+      end)
+
+      {:ok, slack_bypass: slack_bypass}
+    end
+
+    test "pass B Slack message includes guild_view action_id", %{slack_bypass: slack_bypass} do
+      thread = insert_thread("pr_open")
+
+      insert_artifact(thread.id, "pull_request",
+        source: "github",
+        external_id: "88",
+        url: "https://github.com/owner/test-repo/pull/88"
+      )
+
+      Repo.insert!(%Event{
+        source: "github",
+        event_type: "pull_request.merged",
+        occurred_at: DateTime.utc_now(),
+        raw_payload: %{"action" => "closed", "pull_request" => %{"merged" => true}},
+        idempotency_key: "pr_merged:88:#{System.unique_integer()}",
+        thread_id: thread.id
+      })
+
+      received = Agent.start_link(fn -> nil end) |> elem(1)
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        Agent.update(received, fn _ -> decoded end)
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      msg = Agent.get(received, & &1)
+      assert msg != nil
+      assert is_list(msg["blocks"])
+
+      action_ids =
+        msg["blocks"]
+        |> Enum.filter(&(&1["type"] == "actions"))
+        |> Enum.flat_map(& &1["elements"])
+        |> Enum.map(& &1["action_id"])
+
+      assert "guild_view" in action_ids
+    end
+  end
+
   describe "held thread skipping — pass A" do
     test "pass A skips executing threads with held = true", %{bypass: _bypass} do
       thread = insert_thread_with_id("held-issue-1", "executing")

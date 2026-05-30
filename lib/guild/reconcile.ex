@@ -189,8 +189,36 @@ defmodule Guild.Reconcile do
           {:ok, :pr_open} ->
             Logger.info("Thread #{thread.id} transitioned executing → pr_open (PR ##{pr_number})")
 
+            issue_number = thread.anchor_id
+
+            blocks = [
+              %{
+                type: "section",
+                text: %{type: "mrkdwn", text: "Thread ##{thread.id}: :pr_open — #{pr_url}"}
+              },
+              %{
+                type: "actions",
+                elements: [
+                  %{
+                    type: "button",
+                    text: %{type: "plain_text", text: "Hold"},
+                    action_id: "guild_hold",
+                    value: issue_number
+                  },
+                  %{
+                    type: "button",
+                    text: %{type: "plain_text", text: "Abandon"},
+                    action_id: "guild_abandon",
+                    value: issue_number
+                  }
+                ]
+              }
+            ]
+
             Guild.Adapters.Slack.post_message(
-              "Thread ##{thread.id}: :pr_open — #{pr_url}"
+              nil,
+              "Thread ##{thread.id}: :pr_open — #{pr_url}",
+              blocks: blocks
             )
 
           {:error, tier, reason} ->
@@ -242,8 +270,32 @@ defmodule Guild.Reconcile do
             "Thread #{thread.id} transitioned pr_open → done (PR ##{pr_number} merged)"
           )
 
+          thread_url =
+            GuildWeb.Endpoint.url() <> "/threads/#{thread.id}"
+
+          blocks = [
+            %{
+              type: "section",
+              text: %{type: "mrkdwn", text: "Thread ##{thread.id}: :done"}
+            },
+            %{
+              type: "actions",
+              elements: [
+                %{
+                  type: "button",
+                  text: %{type: "plain_text", text: "View"},
+                  action_id: "guild_view",
+                  value: thread.id,
+                  url: thread_url
+                }
+              ]
+            }
+          ]
+
           Guild.Adapters.Slack.post_message(
-            "Thread ##{thread.id}: :done"
+            nil,
+            "Thread ##{thread.id}: :done",
+            blocks: blocks
           )
 
           if thread.linear_issue_id do

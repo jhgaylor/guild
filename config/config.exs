@@ -32,7 +32,15 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-config :guild, Oban, repo: Guild.Repo, queues: [claims: 10]
+config :guild, Oban,
+  repo: Guild.Repo,
+  queues: [claims: 10],
+  plugins: [
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"0 9 * * *", Guild.Digest}
+     ]}
+  ]
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
