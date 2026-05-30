@@ -2,6 +2,15 @@
 
 Guild is a platform for building autonomous workers that participate in the software development lifecycle.
 
+## Try It on Your Repo
+
+Guild self-hosts on your own infrastructure — no data leaves your environment.
+
+- **Full setup guide:** follow [docs/setup.md](docs/setup.md) to go from a fresh fork to a running Guild instance in about 30 minutes (GitHub App, Kubernetes deploy, first `bot-ready` cycle verified).
+- **Live demo walkthrough:** [docs/demo.md](docs/demo.md) has a 5-minute operator script and a 15-minute deep dive you can run against any configured repo.
+- **Add more repos:** after the initial deploy, register additional repositories with [docs/add-repo.md](docs/add-repo.md) — no redeployment required.
+- **Slack and Linear are optional:** Guild starts cleanly without them; set `SLACK_BOT_TOKEN` / `LINEAR_API_KEY` when you're ready to enable those integrations.
+
 ## The Premise
 
 Most AI coding tools today are **trigger systems** — an event arrives, a job runs, it's done. The bot has no memory of yesterday, no awareness of the related PR that's failing, no way to respond when you ask it to hold off in Slack.
