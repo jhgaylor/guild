@@ -409,5 +409,85 @@ defmodule GuildWeb.WebhookControllerTest do
       assert thread != nil
       assert thread.owner == "specific-worker"
     end
+
+    test "two-repo routing: issues.opened dispatches correct worker_id per repo", %{
+      conn: conn,
+      bypass: bypass
+    } do
+      # Seed both a "default" and an "alt" worker row
+      Repo.insert!(%Schema.Worker{
+        worker_id: "default",
+        fountain_agent_id: "test-agent",
+        vault_id: ""
+      })
+
+      Repo.insert!(%Schema.Worker{
+        worker_id: "alt",
+        fountain_agent_id: "test-agent",
+        vault_id: ""
+      })
+
+      # Seed repo-a → default worker, repo-b → alt worker
+      Repo.insert!(%Schema.Repo{full_name: "owner/repo-a", enabled: true, worker_id: "default"})
+      Repo.insert!(%Schema.Repo{full_name: "owner/repo-b", enabled: true, worker_id: "alt"})
+
+      # Expect two Fountain API calls (one per repo, Oban inline mode runs jobs immediately)
+      Bypass.expect(bypass, "POST", "/api/conversations", fn conn ->
+        conv_id = "conv-routing-#{System.unique_integer([:positive])}"
+
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: conv_id}}))
+      end)
+
+      body_a =
+        Jason.encode!(%{
+          "action" => "opened",
+          "sender" => %{"login" => "octocat"},
+          "issue" => %{
+            "number" => 50,
+            "title" => "Issue on repo-a",
+            "labels" => [%{"name" => "bot-ready"}]
+          },
+          "repository" => %{"full_name" => "owner/repo-a"}
+        })
+
+      conn_a = signed_conn(conn, body_a, "issues")
+      assert conn_a.status == 200
+
+      # ClaimWorker runs inline and sets thread.owner from the Repo row's worker_id
+      thread_a =
+        Repo.one(
+          from t in Thread,
+            where: t.anchor_type == "github_issue" and t.anchor_id == "50"
+        )
+
+      assert thread_a != nil
+      assert thread_a.owner == "default"
+
+      body_b =
+        Jason.encode!(%{
+          "action" => "opened",
+          "sender" => %{"login" => "octocat"},
+          "issue" => %{
+            "number" => 51,
+            "title" => "Issue on repo-b",
+            "labels" => [%{"name" => "bot-ready"}]
+          },
+          "repository" => %{"full_name" => "owner/repo-b"}
+        })
+
+      conn_b = signed_conn(conn, body_b, "issues")
+      assert conn_b.status == 200
+
+      thread_b =
+        Repo.one(
+          from t in Thread,
+            where: t.anchor_type == "github_issue" and t.anchor_id == "51"
+        )
+
+      assert thread_b != nil
+      assert thread_b.owner == "alt"
+    end
   end
 end
