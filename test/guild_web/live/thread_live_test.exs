@@ -84,6 +84,51 @@ defmodule GuildWeb.ThreadLiveTest do
     end
   end
 
+  describe "thread action buttons" do
+    setup do
+      Guild.Repo.insert!(%Guild.Schema.Worker{
+        worker_id: "test-worker",
+        fountain_agent_id: "agent-uuid",
+        vault_id: "vault-uuid"
+      })
+      on_exit(fn ->
+        Guild.Repo.delete_all(Guild.Schema.Thread)
+        Guild.Repo.delete_all(Guild.Schema.Worker)
+      end)
+      :ok
+    end
+
+    test "executing non-held thread shows Hold and Abandon, no Resume", %{conn: conn} do
+      thread = Guild.Repo.insert!(%Guild.Schema.Thread{
+        anchor_type: "github_issue", anchor_id: "100",
+        state: "executing", held: false
+      })
+      {:ok, _view, html} = live(conn |> with_auth(), ~p"/threads/#{thread.id}")
+      assert html =~ "Hold"
+      assert html =~ "Abandon"
+      refute html =~ "Resume"
+    end
+
+    test "held thread shows Resume, no Hold", %{conn: conn} do
+      thread = Guild.Repo.insert!(%Guild.Schema.Thread{
+        anchor_type: "github_issue", anchor_id: "101",
+        state: "executing", held: true
+      })
+      {:ok, _view, html} = live(conn |> with_auth(), ~p"/threads/#{thread.id}")
+      assert html =~ "Resume"
+      refute html =~ ">Hold<"
+    end
+
+    test "done thread shows no action buttons", %{conn: conn} do
+      thread = Guild.Repo.insert!(%Guild.Schema.Thread{
+        anchor_type: "github_issue", anchor_id: "102",
+        state: "done", held: false
+      })
+      {:ok, _view, html} = live(conn |> with_auth(), ~p"/threads/#{thread.id}")
+      refute html =~ "thread-actions"
+    end
+  end
+
   test "GET /threads/:id shows stuck warning banner for over-threshold executing thread",
        %{conn: conn} do
     {:ok, stuck_thread} =

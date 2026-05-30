@@ -58,7 +58,36 @@ defmodule GuildWeb.AdminController do
   end
 
   def workers(conn, _params) do
-    render(conn, :workers)
+    workers = Guild.Repo.all(Guild.Schema.Worker)
+    changeset = Guild.Schema.Worker.changeset(%Guild.Schema.Worker{}, %{})
+    render(conn, :workers, workers: workers, changeset: changeset)
+  end
+
+  def create_worker(conn, params) do
+    attrs = %{
+      worker_id: String.trim(params["worker_id"] || ""),
+      fountain_agent_id: String.trim(params["fountain_agent_id"] || ""),
+      vault_id: String.trim(params["vault_id"] || ""),
+      github_installation_id: case String.trim(params["github_installation_id"] || "") do
+        "" -> nil
+        v -> v
+      end
+    }
+
+    changeset =
+      Guild.Schema.Worker.changeset(%Guild.Schema.Worker{}, attrs)
+      |> Map.put(:action, :insert)
+
+    case Guild.Repo.insert(changeset) do
+      {:ok, _worker} ->
+        redirect(conn, to: ~p"/admin/workers")
+
+      {:error, changeset} ->
+        workers = Guild.Repo.all(Guild.Schema.Worker)
+        conn
+        |> put_status(200)
+        |> render(:workers, workers: workers, changeset: changeset)
+    end
   end
 
   def integrations(conn, _params) do

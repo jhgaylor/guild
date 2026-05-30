@@ -1,5 +1,42 @@
 <div class="container">
   <h1 class="page-title">Workers</h1>
   <p class="page-subtitle"><a href={~p"/admin"}>← Admin</a></p>
-  <p>Workers management coming in Slice 3</p>
+
+  <%= if Enum.empty?(@workers) do %>
+    <p class="empty-state">No workers configured yet.</p>
+  <% else %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Worker ID</th>
+          <th>Fountain Agent ID</th>
+          <th>Vault ID</th>
+          <th>GitHub Installation ID</th>
+        </tr>
+      </thead>
+      <tbody>
+        <%= for worker <- @workers do %>
+          <tr>
+            <td><code><%= worker.worker_id %></code></td>
+            <td><code><%= worker.fountain_agent_id %></code></td>
+            <td><code><%= worker.vault_id %></code></td>
+            <td><code><%= worker.github_installation_id || "—" %></code></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+
+  <h2 class="section-title" style="margin-top: 2rem;">Add Worker</h2>
+  <p style="margin-bottom: 1rem; color: #666;">
+    These are reference IDs only — no secret values (API keys, tokens) are stored or displayed here.
+  </p>
+
+  <.form :let={f} for={@changeset} action={~p"/admin/workers"} method="post">
+    <.input field={f[:worker_id]} label="Worker ID" placeholder="e.g. default" required />
+    <.input field={f[:fountain_agent_id]} label="Fountain Agent ID" placeholder="UUID of the Fountain agent" required />
+    <.input field={f[:vault_id]} label="Vault ID" placeholder="UUID of the Fountain vault" required />
+    <.input field={f[:github_installation_id]} label="GitHub Installation ID (optional)" placeholder="GitHub App installation ID" />
+    <button type="submit" class="btn btn--primary">Add Worker</button>
+  </.form>
 </div>

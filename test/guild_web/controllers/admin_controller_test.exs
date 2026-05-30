@@ -291,6 +291,68 @@ defmodule GuildWeb.AdminControllerTest do
   end
 
   # ---------------------------------------------------------------------------
+  # /admin/workers tests
+  # ---------------------------------------------------------------------------
+
+  describe "GET /admin/workers" do
+    test "with auth returns 200 and renders workers table", %{conn: conn} do
+      conn = conn |> with_auth() |> get(~p"/admin/workers")
+      body = html_response(conn, 200)
+      assert body =~ "Workers"
+    end
+
+    test "with auth renders seeded worker in table", %{conn: conn} do
+      Guild.Repo.insert!(%Guild.Schema.Worker{
+        worker_id: "test-worker",
+        fountain_agent_id: "agent-uuid",
+        vault_id: "vault-uuid"
+      })
+      on_exit(fn -> Guild.Repo.delete_all(Guild.Schema.Worker) end)
+
+      conn = conn |> with_auth() |> get(~p"/admin/workers")
+      assert html_response(conn, 200) =~ "test-worker"
+    end
+  end
+
+  describe "POST /admin/workers" do
+    setup do
+      on_exit(fn -> Guild.Repo.delete_all(Guild.Schema.Worker) end)
+      :ok
+    end
+
+    test "with valid params creates worker and redirects", %{conn: conn} do
+      conn = conn |> with_auth() |> post(~p"/admin/workers", %{
+        worker_id: "new-worker",
+        fountain_agent_id: "agent-abc",
+        vault_id: "vault-abc"
+      })
+      assert redirected_to(conn) == ~p"/admin/workers"
+      assert Guild.Repo.get(Guild.Schema.Worker, "new-worker") != nil
+    end
+
+    test "with missing worker_id returns 200 with error", %{conn: conn} do
+      conn = conn |> with_auth() |> post(~p"/admin/workers", %{
+        worker_id: "",
+        fountain_agent_id: "agent-abc",
+        vault_id: "vault-abc"
+      })
+      body = html_response(conn, 200)
+      assert body =~ "can&#39;t be blank" or body =~ "can't be blank"
+      assert Guild.Repo.aggregate(Guild.Schema.Worker, :count, :worker_id) == 0
+    end
+
+    test "with missing fountain_agent_id returns 200 with error", %{conn: conn} do
+      conn = conn |> with_auth() |> post(~p"/admin/workers", %{
+        worker_id: "new-worker",
+        fountain_agent_id: "",
+        vault_id: "vault-abc"
+      })
+      body = html_response(conn, 200)
+      assert body =~ "can&#39;t be blank" or body =~ "can't be blank"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Banner tests
   # ---------------------------------------------------------------------------
 

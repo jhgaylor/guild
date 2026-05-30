@@ -64,6 +64,10 @@ defmodule GuildWeb.Router do
       live "/threads/:id", ThreadLive, :show
     end
 
+    post "/threads/:id/hold", ThreadActionController, :hold
+    post "/threads/:id/resume", ThreadActionController, :resume
+    post "/threads/:id/abandon", ThreadActionController, :abandon
+
     scope "/admin" do
       get "/", AdminController, :index
       get "/repos", AdminController, :repos
@@ -71,6 +75,7 @@ defmodule GuildWeb.Router do
       patch "/repos/:encoded_name/toggle", AdminController, :toggle_repo
       delete "/repos/:encoded_name", AdminController, :disable_repo
       get "/workers", AdminController, :workers
+      post "/workers", AdminController, :create_worker
       get "/integrations", AdminController, :integrations
     end
   end
