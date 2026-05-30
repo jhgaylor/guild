@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g7-slice-plan** — captain-picard decomposing [`plan/g7-framing/framing.md`](plan/g7-framing/framing.md) (Get Guild to first-customer-demo readiness; closes on driver judgment) into `plan/g7/slice-plan.md`. Driver reviews/approves before any slice dispatches. (G6 closed + deployed; see Gated → G6.)
+- **G7 slice plan** — PR open, awaiting driver approval before any slice is dispatched. See [`plan/g7/slice-plan.md`](plan/g7/slice-plan.md) (4 slices: multi-repo live-fire → UI polish → demo runbook → driver dry-run). No implementation until driver approves.
 
 ## Done
 
