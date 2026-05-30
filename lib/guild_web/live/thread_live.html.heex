@@ -31,136 +31,27 @@
     </dl>
   </section>
 
-  <h2 class="section-title">Events (<%= length(@thread.events) %>)</h2>
-  <%= if Enum.empty?(@thread.events) do %>
-    <p class="empty-state">No events yet.</p>
+  <h2 class="section-title">Timeline (<%= length(@timeline) %>)</h2>
+  <%= if Enum.empty?(@timeline) do %>
+    <p class="empty-state">No activity yet.</p>
   <% else %>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>When</th>
-          <th>Source</th>
-          <th>Type</th>
-          <th>Actor</th>
-        </tr>
-      </thead>
-      <tbody>
-        <%= for event <- @thread.events do %>
-          <tr>
-            <td class="timestamp"><%= GuildWeb.Format.time(event.occurred_at) %></td>
-            <td class="mono"><%= event.source %></td>
-            <td class="mono"><%= event.event_type %></td>
-            <td class="muted">
-              <%= cond do
-                event.actor_type && event.actor_id -> "#{event.actor_type}/#{event.actor_id}"
-                event.actor_type -> event.actor_type
-                event.actor_id -> event.actor_id
-                true -> "—"
-              end %>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  <% end %>
-
-  <h2 class="section-title">Context Notes (<%= length(@thread.context_notes) %>)</h2>
-  <%= if Enum.empty?(@thread.context_notes) do %>
-    <p class="empty-state">No context notes yet.</p>
-  <% else %>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Body</th>
-          <th>When</th>
-        </tr>
-      </thead>
-      <tbody>
-        <%= for note <- @thread.context_notes do %>
-          <tr>
-            <td class="mono"><%= note.note_type %></td>
-            <td><%= note.body %></td>
-            <td class="timestamp"><%= GuildWeb.Format.time(note.inserted_at) %></td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  <% end %>
-
-  <h2 class="section-title">Decisions (<%= length(@thread.decisions_log) %>)</h2>
-  <%= if Enum.empty?(@thread.decisions_log) do %>
-    <p class="empty-state">No decisions yet.</p>
-  <% else %>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Action</th>
-          <th>Reasoning</th>
-          <th>When</th>
-        </tr>
-      </thead>
-      <tbody>
-        <%= for decision <- @thread.decisions_log do %>
-          <tr>
-            <td class="mono"><%= decision.decision_type %></td>
-            <td class="reasoning-cell">
-              <%= String.slice(decision.reasoning || "", 0, 160) %><%= if String.length(decision.reasoning || "") > 160, do: "…" %>
-            </td>
-            <td class="timestamp"><%= GuildWeb.Format.time(decision.inserted_at) %></td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  <% end %>
-
-  <h2 class="section-title">Artifacts (<%= length(@thread.artifacts) %>)</h2>
-  <%= if Enum.empty?(@thread.artifacts) do %>
-    <p class="empty-state">No artifacts yet.</p>
-  <% else %>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Source</th>
-          <th>Link</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        <%= for artifact <- @thread.artifacts do %>
-          <tr>
-            <td class="mono"><%= artifact.artifact_type %></td>
-            <td class="mono muted"><%= artifact.source %></td>
-            <td>
-              <%= cond do
-                artifact.url && artifact.url != "" -> nil
-                true -> nil
-              end %>
-              <%= if artifact.url && artifact.url != "" do %>
-                <a href={artifact.url} target="_blank" rel="noopener">
-                  <%= artifact.url %>
-                </a>
-              <% else %>
-                <%= if artifact.artifact_type == "fountain_conversation" and @fountain_base_url != "" do %>
-                  <a href={"#{@fountain_base_url}/conversations/#{artifact.external_id}"} target="_blank" rel="noopener">
-                    <code><%= artifact.external_id %></code>
-                  </a>
-                <% else %>
-                  <code><%= artifact.external_id %></code>
-                <% end %>
-              <% end %>
-            </td>
-            <td>
-              <%= if artifact.artifact_type == "fountain_conversation" && @conv_status do %>
-                <span class={"conv-status conv-status--#{@conv_status}"}><%= @conv_status %></span>
-              <% else %>
-                <span class="muted">—</span>
-              <% end %>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
+    <ul class="timeline-list" style="list-style: none; padding: 0; margin: 0;">
+      <%= for entry <- @timeline do %>
+        <li class="timeline-item" style="display: flex; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid #eee; align-items: flex-start;">
+          <span class={"badge badge--#{entry.kind}"} style="flex-shrink: 0; min-width: 5rem; text-align: center;">
+            <%= entry.kind %>
+          </span>
+          <span class="timeline-summary" style="flex: 1;">
+            <%= entry.summary %>
+            <%= if entry.kind == "decision" && !entry.meta.has_snapshot do %>
+              <span class="badge badge--trimmed" style="margin-left: 0.5rem; font-size: 0.75em; opacity: 0.7;">snapshot trimmed</span>
+            <% end %>
+          </span>
+          <span class="timestamp" style="flex-shrink: 0; white-space: nowrap;">
+            <%= GuildWeb.Format.time(entry.timestamp) %>
+          </span>
+        </li>
+      <% end %>
+    </ul>
   <% end %>
 </div>

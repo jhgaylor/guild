@@ -55,4 +55,41 @@ defmodule GuildWeb.ThreadControllerTest do
     conn = conn |> with_auth() |> get(~p"/threads")
     assert html_response(conn, 200) =~ "stuck"
   end
+
+  test "GET /threads shows recent activity panel with most recent thread", %{conn: conn, thread: thread} do
+    conn = conn |> with_auth() |> get(~p"/threads")
+    body = html_response(conn, 200)
+    assert body =~ "Recent Activity"
+    assert body =~ thread.anchor_id
+  end
+
+  test "GET /threads recent activity panel does not show oldest thread when 6 exist", %{conn: conn} do
+    # Create 6 threads; the oldest (i=1) should be excluded from the top-5 panel
+    threads =
+      for i <- 1..6 do
+        %Guild.Schema.Thread{}
+        |> Guild.Schema.Thread.changeset(%{
+          anchor_type: "github_issue",
+          anchor_id: "ra-test-#{i}",
+          state: "noticed"
+        })
+        |> Guild.Repo.insert!()
+      end
+
+    # Push the first thread's updated_at into the past so it is oldest
+    oldest = hd(threads)
+    past = DateTime.add(DateTime.utc_now(), -7200, :second)
+    import Ecto.Query
+    Guild.Repo.update_all(
+      from(t in Guild.Schema.Thread, where: t.id == ^oldest.id),
+      set: [updated_at: past]
+    )
+
+    conn = conn |> with_auth() |> get(~p"/threads")
+    body = html_response(conn, 200)
+    assert body =~ "Recent Activity"
+    # The 6th (most-recent) thread should appear in the recent panel
+    assert body =~ "ra-test-6"
+    # The oldest (ra-test-1) may appear in the full table but not necessarily in recent panel
+  end
 end

@@ -1,10 +1,21 @@
 defmodule GuildWeb.PageControllerTest do
   use GuildWeb.ConnCase
 
-  test "GET /", %{conn: conn} do
+  test "GET / returns 200 with Guild title and marketing copy", %{conn: conn} do
     conn = get(conn, ~p"/")
-    assert html_response(conn, 200) =~ "Guild"
-    assert html_response(conn, 200) =~ "Threads"
-    assert html_response(conn, 200) =~ "Decisions"
+    body = html_response(conn, 200)
+    assert body =~ "Guild"
+    assert body =~ "autonomous agent"
+    assert body =~ "bot-ready issues"
+  end
+
+  test "GET / contains link to /threads", %{conn: conn} do
+    conn = get(conn, ~p"/")
+    assert html_response(conn, 200) =~ ~p"/threads"
+  end
+
+  test "GET / contains link to /jobs", %{conn: conn} do
+    conn = get(conn, ~p"/")
+    assert html_response(conn, 200) =~ ~p"/jobs"
   end
 end

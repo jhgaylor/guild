@@ -31,19 +31,49 @@ defmodule GuildWeb.ThreadLiveTest do
     assert html =~ "executing"
   end
 
-  test "GET /threads/:id renders events section", %{conn: conn, thread: thread} do
+  test "GET /threads/:id renders merged timeline section", %{conn: conn, thread: thread} do
     {:ok, _view, html} = conn |> with_auth() |> live(~p"/threads/#{thread.id}")
-    assert html =~ "Events"
+    assert html =~ "Timeline"
   end
 
-  test "GET /threads/:id renders artifacts section", %{conn: conn, thread: thread} do
+  test "GET /threads/:id shows owner info card", %{conn: conn, thread: thread} do
     {:ok, _view, html} = conn |> with_auth() |> live(~p"/threads/#{thread.id}")
-    assert html =~ "Artifacts"
+    assert html =~ "Owner"
+    assert html =~ "Created"
+    assert html =~ "Updated"
   end
 
-  test "GET /threads/:id renders context_notes section", %{conn: conn, thread: thread} do
+  test "GET /threads/:id shows timeline entries for decisions with snapshot trimmed indicator",
+       %{conn: conn, thread: thread} do
+    # Insert a decision with no context_snapshot
+    {:ok, _} =
+      %Guild.Schema.DecisionsLog{}
+      |> Guild.Schema.DecisionsLog.changeset(%{
+        thread_id: thread.id,
+        decision_type: "plan",
+        reasoning: "test reasoning without snapshot"
+      })
+      |> Guild.Repo.insert()
+
     {:ok, _view, html} = conn |> with_auth() |> live(~p"/threads/#{thread.id}")
-    assert html =~ "Context Notes"
+    assert html =~ "snapshot trimmed"
+  end
+
+  test "GET /threads/:id does NOT show snapshot trimmed when snapshot present",
+       %{conn: conn, thread: thread} do
+    # Insert a decision with a context_snapshot
+    {:ok, _} =
+      %Guild.Schema.DecisionsLog{}
+      |> Guild.Schema.DecisionsLog.changeset(%{
+        thread_id: thread.id,
+        decision_type: "claim",
+        reasoning: "reasoning with snapshot",
+        context_snapshot: %{"key" => "value"}
+      })
+      |> Guild.Repo.insert()
+
+    {:ok, _view, html} = conn |> with_auth() |> live(~p"/threads/#{thread.id}")
+    refute html =~ "snapshot trimmed"
   end
 
   test "unauthenticated live mount is rejected", %{conn: conn, thread: thread} do

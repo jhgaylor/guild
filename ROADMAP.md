@@ -9,6 +9,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 ## Now
 
 - **g7-slice-1** — in flight (Guild-side engineering only). `Guild.Release.add_repo/3` callable via `bin/guild eval`; two-repos routing smoke test; `docs/add-repo.md` operator runbook. Operator-completed steps (Jake picks repo + installs App + creates first `bot-ready` issue) follow merge + deploy. Branch: `g7/slice-1-multi-repo`.
+- **g7-slice-2** — in flight. Operator UI polish: home page public pitch, interleaved thread timeline (merged chronological feed replacing four-section layout), "Recent activity" strip on threads index. Branch: `g7/slice-2-ui-polish`.
 
 ## Done
 
