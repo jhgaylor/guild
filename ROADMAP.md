@@ -8,10 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g6-slice-1** — in flight. Polish foundations: Linear `:executing` wiring, Pass D `terminated` artifact flag, `state_entered_at` column (replaces `updated_at` proxy in Pass C), OTP 28.1+ base-image bump. Branch: `g6/slice-1-polish`.
+- **g6-slice-2** — in flight. Slack interactive buttons (`Hold`/`Abandon` on `:pr_open`) via new `POST /slack/interactions` (same v0 HMAC) + operator digest (Oban Cron, daily, `Guild.Digest`). Branch: `g6/slice-2-slack-ux`. _(Slice 1 PR #45 merged; CI building → deploy.)_
 
 ## Done
 
+- **g6-slice-1** — PR #45 merged (6c22b0c). Polish foundations: Linear `:executing → In Progress` wired in `Guild.Claiming` (uses `state_id(:in_progress)` helper, `:stateId` key, graceful no-op when unconfigured); Pass D `terminated` artifact flag (skips already-flagged via `where: not a.terminated`, flips on success / already-`:terminated` status); `state_entered_at` column set in `Meta.update_thread_state` on every transition, Pass C uses `coalesce(state_entered_at, updated_at)`; OTP 28.0.1 → 28.1.1 base-image bump (kills the regex-recompile perf warning). Driver added missing tests pinning Pass D's flag-flip + skip behavior. 330 tests green.
 - **g6-slice-plan** — PR #44 merged (46ac2f8). G6 (Adapter depth + polish) decomposed into 4 slices: (1) polish foundations, (2) Slack interactive buttons + operator digest, (3) bidirectional sync [ADR 0016], (4) thread-timeline polish (stretch, may slip G7). Driver approved.
 - **g5-slice-4** — PR #43 merged (ab69f3f). Worker-conv lifecycle: Reconcile Pass D terminates the Fountain conv for `:done`/`:abandoned` threads (idempotent — skips already-`:terminated` via `get_status`, uses existing `Fountain.terminate_conversation/1`, per-thread try/rescue); conv status shown in thread detail. Digest deferred to G6. 329 tests green. Fixes the worker-conv accumulation surfaced in the G4 live-fire. (G6 note: re-checks `get_status` for every terminal thread each cycle — add an artifact terminated flag to skip.)
 
