@@ -117,6 +117,62 @@ defmodule Guild.ReconcileTest do
       assert "guild_hold" in action_ids
       assert "guild_abandon" in action_ids
     end
+
+    test "pass A creates slack_message artifact with correct url when Slack returns channel+ts", %{slack_bypass: slack_bypass} do
+      thread = insert_thread("executing")
+      insert_seed_event(thread.id)
+      insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-artifact-a")
+
+      Guild.GitHub.TestAdapter.configure(:list_pull_requests, {:ok, [
+        %{"number" => 56, "html_url" => "https://github.com/owner/test-repo/pull/56", "body" => "Closes #3"}
+      ]})
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true, channel: "C_TEST", ts: "1111111111.000001"}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      artifact =
+        Repo.one(
+          from a in Artifact,
+            where: a.thread_id == ^thread.id and a.artifact_type == "slack_message"
+        )
+
+      assert artifact != nil
+      assert artifact.source == "slack"
+      assert artifact.external_id == "1111111111.000001"
+      assert artifact.url == "slack://C_TEST/1111111111.000001"
+    end
+
+    test "pass A skips slack_message artifact when Slack returns no channel/ts", %{slack_bypass: slack_bypass} do
+      thread = insert_thread("executing")
+      insert_seed_event(thread.id)
+      insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-no-ts-a")
+
+      Guild.GitHub.TestAdapter.configure(:list_pull_requests, {:ok, [
+        %{"number" => 57, "html_url" => "https://github.com/owner/test-repo/pull/57", "body" => "Closes #3"}
+      ]})
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      count =
+        Repo.aggregate(
+          from(a in Artifact, where: a.thread_id == ^thread.id and a.artifact_type == "slack_message"),
+          :count,
+          :id
+        )
+
+      assert count == 0
+    end
   end
 
   describe "pass_b Slack blocks — pr_open → done" do
@@ -179,6 +235,93 @@ defmodule Guild.ReconcileTest do
         |> Enum.map(& &1["action_id"])
 
       assert "guild_view" in action_ids
+    end
+
+    test "pass B creates slack_message artifact with correct url when Slack returns channel+ts", %{slack_bypass: slack_bypass} do
+      thread = insert_thread("pr_open")
+
+      insert_artifact(thread.id, "pull_request",
+        source: "github",
+        external_id: "89",
+        url: "https://github.com/owner/test-repo/pull/89"
+      )
+
+      Repo.insert!(%Event{
+        source: "github",
+        event_type: "pull_request.merged",
+        occurred_at: DateTime.utc_now(),
+        raw_payload: %{"action" => "closed", "pull_request" => %{"merged" => true}},
+        idempotency_key: "pr_merged:89:#{System.unique_integer()}",
+        thread_id: thread.id
+      })
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true, channel: "C_TEST", ts: "2222222222.000002"}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      artifact =
+        Repo.one(
+          from a in Artifact,
+            where: a.thread_id == ^thread.id and a.artifact_type == "slack_message"
+        )
+
+      assert artifact != nil
+      assert artifact.source == "slack"
+      assert artifact.external_id == "2222222222.000002"
+      assert artifact.url == "slack://C_TEST/2222222222.000002"
+    end
+
+    test "pass B slack_message artifact insertion is idempotent (on_conflict: :nothing)", %{slack_bypass: slack_bypass} do
+      thread = insert_thread("pr_open")
+
+      insert_artifact(thread.id, "pull_request",
+        source: "github",
+        external_id: "90",
+        url: "https://github.com/owner/test-repo/pull/90"
+      )
+
+      Repo.insert!(%Event{
+        source: "github",
+        event_type: "pull_request.merged",
+        occurred_at: DateTime.utc_now(),
+        raw_payload: %{"action" => "closed", "pull_request" => %{"merged" => true}},
+        idempotency_key: "pr_merged:90:#{System.unique_integer()}",
+        thread_id: thread.id
+      })
+
+      # Pre-insert the artifact to simulate a duplicate
+      {:ok, _} =
+        %Artifact{}
+        |> Artifact.changeset(%{
+          thread_id: thread.id,
+          artifact_type: "slack_message",
+          source: "slack",
+          external_id: "3333333333.000003",
+          url: "slack://C_TEST/3333333333.000003"
+        })
+        |> Repo.insert()
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true, channel: "C_TEST", ts: "3333333333.000003"}))
+      end)
+
+      # Should not raise — on_conflict: :nothing handles the duplicate
+      :ok = Guild.Reconcile.reconcile_all()
+
+      count =
+        Repo.aggregate(
+          from(a in Artifact, where: a.thread_id == ^thread.id and a.artifact_type == "slack_message"),
+          :count,
+          :id
+        )
+
+      assert count == 1
     end
   end
 

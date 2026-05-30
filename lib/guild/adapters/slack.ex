@@ -60,7 +60,7 @@ defmodule Guild.Adapters.Slack do
           {:ok, %{status_code: status} = response} when status in 200..299 ->
             case Jason.decode(response.body) do
               {:ok, %{"ok" => true} = decoded} ->
-                {:ok, decoded}
+                {:ok, %{channel: Map.get(decoded, "channel"), ts: Map.get(decoded, "ts")}}
 
               {:ok, %{"ok" => false, "error" => err}} ->
                 Logger.warning("Slack API error: #{err}")

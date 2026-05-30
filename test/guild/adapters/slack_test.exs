@@ -57,10 +57,10 @@ defmodule Guild.Adapters.SlackTest do
 
         conn
         |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true, ts: "12345.6789"}))
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true, channel: "C123", ts: "12345.6789"}))
       end)
 
-      assert {:ok, %{"ok" => true}} = Slack.post_message("C123", "Hello World")
+      assert {:ok, %{channel: "C123", ts: "12345.6789"}} = Slack.post_message("C123", "Hello World")
     end
 
     test "uses bearer token in Authorization header", %{bypass: bypass} do
@@ -148,10 +148,10 @@ defmodule Guild.Adapters.SlackTest do
 
         conn
         |> Plug.Conn.put_resp_content_type("application/json")
-        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true, ts: "12345.6789"}))
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true, channel: "C123", ts: "12345.6789"}))
       end)
 
-      assert {:ok, %{"ok" => true}} = Slack.post_message("C123", "some text", blocks: blocks)
+      assert {:ok, %{channel: "C123", ts: "12345.6789"}} = Slack.post_message("C123", "some text", blocks: blocks)
     end
 
     test "omits blocks key when opts is empty", %{bypass: bypass} do

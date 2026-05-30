@@ -31,6 +31,9 @@ if config_env() != :test do
   config :guild, worker_vault_id: System.get_env("GUILD_WORKER_VAULT_ID", "")
   # Optional: if absent, all /slack/commands requests are rejected 403 (fail-secure).
   config :guild, slack_signing_secret: System.get_env("SLACK_SIGNING_SECRET")
+  # Optional: if absent, all /linear/webhooks requests are rejected 403 (fail-secure).
+  # Linear team admin configures webhook URL out-of-band.
+  config :guild, linear_webhook_secret: System.get_env("LINEAR_WEBHOOK_SECRET")
 end
 
 # Fountain + Guild implementer agent config
