@@ -8,10 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **G6 slice plan** — PR open, awaiting driver approval before any slice is dispatched.
+- **g6-slice-1** — in flight. Polish foundations: Linear `:executing` wiring, Pass D `terminated` artifact flag, `state_entered_at` column (replaces `updated_at` proxy in Pass C), OTP 28.1+ base-image bump. Branch: `g6/slice-1-polish`.
 
 ## Done
 
+- **g6-slice-plan** — PR #44 merged (46ac2f8). G6 (Adapter depth + polish) decomposed into 4 slices: (1) polish foundations, (2) Slack interactive buttons + operator digest, (3) bidirectional sync [ADR 0016], (4) thread-timeline polish (stretch, may slip G7). Driver approved.
 - **g5-slice-4** — PR #43 merged (ab69f3f). Worker-conv lifecycle: Reconcile Pass D terminates the Fountain conv for `:done`/`:abandoned` threads (idempotent — skips already-`:terminated` via `get_status`, uses existing `Fountain.terminate_conversation/1`, per-thread try/rescue); conv status shown in thread detail. Digest deferred to G6. 329 tests green. Fixes the worker-conv accumulation surfaced in the G4 live-fire. (G6 note: re-checks `get_status` for every terminal thread each cycle — add an artifact terminated flag to skip.)
 
 - **g5-slice-3** — PR #42 merged (4e2c870). Slack human-in-the-loop (ADR 0015): `GuildWeb.SlackController` `POST /slack/commands` with v0 HMAC verification (fail-secure + 5-min replay guard, raw body via CacheBodyReader); `Guild.Control` hold/resume/abandon (resolve by issue# or UUID); `held` flag + migration; reconcile Pass A/C skip held threads; abandon→`:abandoned` (reused existing state-machine transition) + Oban job cancel; `SLACK_SIGNING_SECRET` in secret.yaml. 326 tests green.
