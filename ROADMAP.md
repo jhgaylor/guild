@@ -8,7 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g9-slice-2** — in progress on branch `g9/slice-2-inbound-association`. Brief written at `plan/g9-slice-2/general-purpose-engineer-brief.md`. Inbound association (reactions on parent OR reply → work thread; message-event replies → Event with thread_id set) + "Open in Slack" link on `/threads/:id`. _(Slice 1 PR #59 merged; CI building → deploy.)_
+- **g9-slice-3** — in flight (Guild-side engineering only). `docs/slack-setup.md` operator runbook + `Guild.Release.slack_ping/0` sanity-check via `bin/guild eval`. Operator-completed steps (Jake provisions Slack App + secrets + invites bot) follow merge + deploy. Branch: `g9/slice-3-slack-setup`. _(Slice 2 PR #60 merged; CI building → deploy.)_
+
+## Done
+
+- **g9-slice-2** — PR #60 merged (9c6a758). Inbound association + "Open in Slack" link: new `resolve_work_thread/3` helper runs three lookup strategies in order — (a) `slack_message` artifact by `slack://channel/ts` URL; (b) `threads` by `(slack_channel, slack_thread_ts)` matching the message ts; (c) `threads` by `(slack_channel, slack_thread_ts)` matching the message's `thread_ts` (catches reactions on replies and message-event replies). Slack Events handler now resolves once per event and uses the result for BOTH the audit `Event.thread_id` and the `stop_sign → Control.hold` dispatch — driver fixed a gap where reactions resolved for the hold but not for the Event row, so they wouldn't appear on `/threads/:id` timeline. `/threads/:id` LiveView renders an "Open in Slack" link (`https://slack.com/app_redirect?channel=X&message=Y`) when `slack_thread_ts` is set. 421 tests green.
 
 ## Done
 
