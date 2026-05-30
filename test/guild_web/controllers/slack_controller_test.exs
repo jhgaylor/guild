@@ -350,4 +350,121 @@ defmodule GuildWeb.SlackControllerTest do
       assert event.source == "slack"
     end
   end
+
+  describe "events endpoint — resolve_work_thread strategies" do
+    # Test B — reaction_added via thread column lookup (no artifact)
+    test "reaction_added stop_sign sets held via thread column when no artifact", %{conn: conn} do
+      {:ok, thread} =
+        %Thread{}
+        |> Thread.changeset(%{
+          anchor_type: "github_issue",
+          anchor_id: "g9s2-b",
+          state: "executing",
+          slack_channel: "C123",
+          slack_thread_ts: "333.444"
+        })
+        |> Repo.insert()
+
+      body = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "reaction_added",
+          "reaction" => "stop_sign",
+          "item" => %{
+            "type" => "message",
+            "channel" => "C123",
+            "ts" => "333.444"
+          }
+        }
+      }
+
+      conn = slack_events_conn(conn, body)
+      assert conn.status == 200
+      assert Repo.get!(Thread, thread.id).held == true
+    end
+
+    # Test C — reaction_added on a REPLY via thread_ts
+    test "reaction_added stop_sign on reply resolves via thread_ts (parent)", %{conn: conn} do
+      {:ok, thread} =
+        %Thread{}
+        |> Thread.changeset(%{
+          anchor_type: "github_issue",
+          anchor_id: "g9s2-c",
+          state: "executing",
+          slack_channel: "C123",
+          slack_thread_ts: "555.666"
+        })
+        |> Repo.insert()
+
+      body = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "reaction_added",
+          "reaction" => "stop_sign",
+          "item" => %{
+            "type" => "message",
+            "channel" => "C123",
+            "ts" => "999.000",
+            "thread_ts" => "555.666"
+          }
+        }
+      }
+
+      conn = slack_events_conn(conn, body)
+      assert conn.status == 200
+      assert Repo.get!(Thread, thread.id).held == true
+    end
+
+    # Test D — message reply associates to work thread
+    test "message reply event associates to work thread via thread_ts", %{conn: conn} do
+      {:ok, thread} =
+        %Thread{}
+        |> Thread.changeset(%{
+          anchor_type: "github_issue",
+          anchor_id: "g9s2-d",
+          state: "executing",
+          slack_channel: "C123",
+          slack_thread_ts: "111.222"
+        })
+        |> Repo.insert()
+
+      body = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "message",
+          "channel" => "C123",
+          "ts" => "222.333",
+          "thread_ts" => "111.222",
+          "text" => "a reply"
+        }
+      }
+
+      conn = slack_events_conn(conn, body)
+      assert conn.status == 200
+
+      event = Repo.one(from e in Event,
+        where: e.event_type == "slack.message" and e.thread_id == ^thread.id)
+      assert event != nil
+    end
+
+    # Test E — top-level message (no thread_ts) → Event with thread_id nil
+    test "top-level message event inserts Event with thread_id nil", %{conn: conn} do
+      body = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "message",
+          "channel" => "C123",
+          "ts" => "444.555",
+          "text" => "top-level message"
+        }
+      }
+
+      conn = slack_events_conn(conn, body)
+      assert conn.status == 200
+
+      event = Repo.one(from e in Event,
+        where: e.event_type == "slack.message" and is_nil(e.thread_id))
+      assert event != nil
+    end
+  end
 end
