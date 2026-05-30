@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g7-slice-3** — in flight (docs only). `docs/demo.md` (5-min + 15-min + Try-it preamble), `docs/setup.md` (7-step operator setup), README "Try it on your repo" section. Branch: `g7/slice-3-docs`. _(Slice 2 PR #51 merged; CI building → deploy. Slice 4 dry-run blocks on operator second-repo pick.)_
+- **g7-slice-3** — in progress (docs only). `docs/demo.md` (5-min + 15-min + Try-it preamble), `docs/setup.md` (7-step operator setup), README "Try it on your repo" section. Branch: `g7/slice-3-docs`. Brief at `plan/g7-slice-3/general-purpose-engineer-brief.md`. _(Slice 2 PR #51 merged + deployed. Slice 4 dry-run blocks on operator second-repo pick.)_
 
 ## Done
 
