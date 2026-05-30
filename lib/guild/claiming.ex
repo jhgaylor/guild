@@ -215,11 +215,27 @@ defmodule Guild.Claiming do
 
     if thread.state == "claimed" do
       case Meta.update_thread_state(thread.id, :dispatch) do
-        {:ok, _} -> {:ok, Repo.get!(Thread, thread.id)}
-        {:error, tier, reason} -> {:error, {tier, reason}}
+        {:ok, _} ->
+          thread = Repo.get!(Thread, thread.id)
+          fire_linear_executing(thread)
+          {:ok, thread}
+
+        {:error, tier, reason} ->
+          {:error, {tier, reason}}
       end
     else
       {:ok, thread}
+    end
+  end
+
+  defp fire_linear_executing(thread) do
+    linear_issue_id = thread.linear_issue_id
+    state_id = Guild.Adapters.Linear.state_id(:in_progress)
+
+    if is_nil(linear_issue_id) or is_nil(state_id) do
+      :ok
+    else
+      Guild.Adapters.Linear.update_issue(linear_issue_id, %{stateId: state_id})
     end
   end
 end

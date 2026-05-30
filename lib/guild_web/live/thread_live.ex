@@ -35,7 +35,8 @@ defmodule GuildWeb.ThreadLive do
   end
 
   defp stuck?(thread) do
-    age_s = DateTime.diff(DateTime.utc_now(), thread.updated_at)
+    reference_time = thread.state_entered_at || thread.updated_at
+    age_s = DateTime.diff(DateTime.utc_now(), reference_time)
     (thread.state == "executing" and age_s > 7_200) or
       (thread.state == "pr_open" and age_s > 172_800)
   end

@@ -7,7 +7,7 @@
 # Wedge-B compromises that should be revisited before G3:
 #   - Single-replica deploy (k8s/deployment.yaml).
 
-FROM hexpm/elixir:1.19.5-erlang-28.0.1-debian-bookworm-20260505-slim AS build
+FROM hexpm/elixir:1.19.5-erlang-28.1.1-debian-bookworm-20260505-slim AS build
 
 ENV MIX_ENV=prod
 

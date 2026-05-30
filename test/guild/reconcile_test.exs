@@ -356,6 +356,21 @@ defmodule Guild.ReconcileTest do
       end)
 
       :ok = Guild.Reconcile.reconcile_all()
+
+      # Pass D should flip terminated: true on the artifact so it is not re-checked.
+      art = Repo.get_by(Artifact, thread_id: thread.id, artifact_type: "fountain_conversation")
+      assert art.terminated == true
+    end
+
+    test "skips entirely when artifact.terminated is already true" do
+      thread = insert_thread("done")
+      conv_id = "conv-flagged-#{System.unique_integer([:positive])}"
+      art = insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: conv_id)
+      Repo.update!(Artifact.changeset(art, %{terminated: true}))
+
+      # No Bypass expectations set: any HTTP call to Fountain would 502 from Bypass
+      # and surface as an error in logs. reconcile_all should make zero Fountain calls.
+      :ok = Guild.Reconcile.reconcile_all()
     end
 
     test "skips termination when conversation is already terminated (idempotent)", %{bypass: bypass} do
