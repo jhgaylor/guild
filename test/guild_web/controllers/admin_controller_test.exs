@@ -203,6 +203,142 @@ defmodule GuildWeb.AdminControllerTest do
   end
 
   # ---------------------------------------------------------------------------
+  # /admin/repos tests
+  # ---------------------------------------------------------------------------
+
+  describe "GET /admin/repos" do
+    test "with auth returns 200", %{conn: conn} do
+      conn = conn |> with_auth() |> get(~p"/admin/repos")
+      assert html_response(conn, 200) =~ "Repos"
+    end
+
+    test "with auth renders seeded repo in table", %{conn: conn} do
+      Guild.Repo.insert!(%Guild.Schema.Repo{full_name: "owner/testrepo", worker_id: "default", enabled: true})
+      on_exit(fn -> Guild.Repo.delete_all(Guild.Schema.Repo) end)
+
+      conn = conn |> with_auth() |> get(~p"/admin/repos")
+      assert html_response(conn, 200) =~ "owner/testrepo"
+    end
+  end
+
+  describe "POST /admin/repos" do
+    setup do
+      on_exit(fn -> Guild.Repo.delete_all(Guild.Schema.Repo) end)
+      :ok
+    end
+
+    test "with valid full_name creates repo and redirects", %{conn: conn} do
+      conn = conn |> with_auth() |> post(~p"/admin/repos", %{full_name: "owner/testrepo", worker_id: "default"})
+      assert redirected_to(conn) == ~p"/admin/repos"
+      assert Guild.Repo.get(Guild.Schema.Repo, "owner/testrepo") != nil
+    end
+
+    test "second POST with same full_name is a no-op (idempotent)", %{conn: conn} do
+      conn |> with_auth() |> post(~p"/admin/repos", %{full_name: "owner/testrepo", worker_id: "default"})
+      conn2 = build_conn() |> with_auth() |> post(~p"/admin/repos", %{full_name: "owner/testrepo", worker_id: "default"})
+      assert redirected_to(conn2) == ~p"/admin/repos"
+      assert Guild.Repo.aggregate(Guild.Schema.Repo, :count, :full_name) == 1
+    end
+
+    test "with blank full_name returns 200 with error and no row created", %{conn: conn} do
+      conn = conn |> with_auth() |> post(~p"/admin/repos", %{full_name: "", worker_id: "default"})
+      body = html_response(conn, 200)
+      assert body =~ "can&#39;t be blank" or body =~ "can't be blank"
+      assert Guild.Repo.aggregate(Guild.Schema.Repo, :count, :full_name) == 0
+    end
+  end
+
+  describe "PATCH /admin/repos/:encoded_name/toggle" do
+    setup do
+      Guild.Repo.insert!(%Guild.Schema.Repo{full_name: "owner/togglerepo", worker_id: "default", enabled: true})
+      on_exit(fn -> Guild.Repo.delete_all(Guild.Schema.Repo) end)
+      :ok
+    end
+
+    test "flips enabled from true to false", %{conn: conn} do
+      encoded = URI.encode_www_form("owner/togglerepo")
+      conn = conn |> with_auth() |> patch(~p"/admin/repos/#{encoded}/toggle")
+      assert redirected_to(conn) == ~p"/admin/repos"
+      repo = Guild.Repo.get!(Guild.Schema.Repo, "owner/togglerepo")
+      assert repo.enabled == false
+    end
+
+    test "flips enabled from false to true", %{conn: conn} do
+      Guild.Repo.update!(Ecto.Changeset.change(Guild.Repo.get!(Guild.Schema.Repo, "owner/togglerepo"), enabled: false))
+      encoded = URI.encode_www_form("owner/togglerepo")
+      conn = conn |> with_auth() |> patch(~p"/admin/repos/#{encoded}/toggle")
+      assert redirected_to(conn) == ~p"/admin/repos"
+      repo = Guild.Repo.get!(Guild.Schema.Repo, "owner/togglerepo")
+      assert repo.enabled == true
+    end
+  end
+
+  describe "DELETE /admin/repos/:encoded_name" do
+    setup do
+      Guild.Repo.insert!(%Guild.Schema.Repo{full_name: "owner/deleterepo", worker_id: "default", enabled: true})
+      on_exit(fn -> Guild.Repo.delete_all(Guild.Schema.Repo) end)
+      :ok
+    end
+
+    test "sets enabled: false without hard-deleting the row", %{conn: conn} do
+      encoded = URI.encode_www_form("owner/deleterepo")
+      conn = conn |> with_auth() |> delete(~p"/admin/repos/#{encoded}")
+      assert redirected_to(conn) == ~p"/admin/repos"
+      repo = Guild.Repo.get(Guild.Schema.Repo, "owner/deleterepo")
+      assert repo != nil
+      assert repo.enabled == false
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Banner tests
+  # ---------------------------------------------------------------------------
+
+  describe "GET / banner" do
+    setup do
+      on_exit(fn ->
+        Guild.Repo.delete_all(Guild.Schema.Repo)
+        Guild.Repo.delete_all(Guild.Schema.Worker)
+      end)
+      :ok
+    end
+
+    test "with zero repos shows no repos configured message", %{conn: conn} do
+      conn = get(conn, ~p"/")
+      body = html_response(conn, 200)
+      assert body =~ "No repos configured"
+    end
+
+    test "with one enabled repo, banner is absent for repos gap", %{conn: conn} do
+      Guild.Repo.insert!(%Guild.Schema.Worker{
+        worker_id: "bw",
+        fountain_agent_id: "agent",
+        vault_id: "vault"
+      })
+      Guild.Repo.insert!(%Guild.Schema.Repo{full_name: "owner/r", worker_id: "bw", enabled: true})
+      conn = get(conn, ~p"/")
+      body = html_response(conn, 200)
+      refute body =~ "No repos configured"
+    end
+  end
+
+  describe "GET /threads banner" do
+    setup do
+      on_exit(fn ->
+        Guild.Repo.delete_all(Guild.Schema.Repo)
+        Guild.Repo.delete_all(Guild.Schema.Worker)
+      end)
+      :ok
+    end
+
+    test "with zero repos shows no repos configured message", %{conn: conn} do
+      conn = conn |> with_auth() |> get(~p"/threads")
+      body = html_response(conn, 200)
+      assert body =~ "No repos configured"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Helpers
   # ---------------------------------------------------------------------------
 

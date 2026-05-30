@@ -2,6 +2,7 @@ defmodule GuildWeb.PageController do
   use GuildWeb, :controller
 
   def home(conn, _params) do
-    render(conn, :home)
+    gaps = Guild.Setup.gaps()
+    render(conn, :home, gaps: gaps)
   end
 end

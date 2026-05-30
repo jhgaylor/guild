@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g8-slice-2** — in flight. Repos CRUD (`/admin/repos` list + add + toggle + soft-disable) + setup-readiness banner on `/` and `/threads`. Branch: `g8/slice-2-repos-banner`. _(Slice 1 PR #55 merged; CI building → deploy.)_
+- **g8-slice-2** — in progress on branch `g8/slice-2-repos-banner`. Repos CRUD (`/admin/repos` list + add + toggle + soft-disable) + setup-readiness banner on `/` and `/threads`. Brief at `plan/g8-slice-2/general-purpose-engineer-brief.md`. _(Slice 1 PR #55 merged; implementation delegated to Fountain engineer.)_
 
 ## Done
 
