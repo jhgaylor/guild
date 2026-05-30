@@ -167,5 +167,31 @@ defmodule Guild.Adapters.SlackTest do
 
       assert {:ok, _} = Slack.post_message("C123", "no blocks here")
     end
+
+    test "includes thread_ts in payload when opts[:thread_ts] is given", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        assert decoded["thread_ts"] == "1234.5678"
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true}))
+      end)
+
+      assert {:ok, _} = Slack.post_message("C123", "reply text", thread_ts: "1234.5678")
+    end
+
+    test "omits thread_ts key when not given in opts", %{bypass: bypass} do
+      Bypass.expect_once(bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        refute Map.has_key?(decoded, "thread_ts")
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true}))
+      end)
+
+      assert {:ok, _} = Slack.post_message("C123", "top level text")
+    end
   end
 end
