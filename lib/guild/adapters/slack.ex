@@ -34,18 +34,21 @@ defmodule Guild.Adapters.Slack do
   If channel is nil, falls back to SLACK_CHANNEL_ID env var.
   Returns {:ok, :not_configured} when credentials are absent.
   Returns {:ok, response} on success or {:error, tier, reason} on failure.
+
+  Opts:
+    - `:blocks` — Block Kit blocks list; included in payload when present.
   """
-  def post_message(channel \\ nil, text) do
+  def post_message(channel \\ nil, text, opts \\ []) do
     unless configured?() do
       {:ok, :not_configured}
     else
       channel = channel || default_channel()
 
-      body =
-        Jason.encode!(%{
-          channel: channel,
-          text: text
-        })
+      payload =
+        %{channel: channel, text: text}
+        |> maybe_put_blocks(opts)
+
+      body = Jason.encode!(payload)
 
       headers = [
         {"Authorization", "Bearer #{bot_token()}"},
@@ -79,6 +82,13 @@ defmodule Guild.Adapters.Slack do
       rescue
         e -> {:error, :unexpected, e}
       end
+    end
+  end
+
+  defp maybe_put_blocks(payload, opts) do
+    case Keyword.get(opts, :blocks) do
+      nil -> payload
+      blocks -> Map.put(payload, :blocks, blocks)
     end
   end
 end

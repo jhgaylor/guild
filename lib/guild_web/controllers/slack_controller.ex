@@ -13,23 +13,76 @@ defmodule GuildWeb.SlackController do
   must NOT be inside the :auth (basic-auth) pipeline.
   """
   def commands(conn, params) do
+    with :ok <- verify_slack_request(conn) do
+      dispatch(conn, params)
+    else
+      {:error, reason} ->
+        Logger.warning("SlackController: signature verification failed: #{reason}")
+        forbidden(conn)
+    end
+  end
+
+  @doc """
+  Handle POST /slack/interactions (Block Kit interactive payloads).
+
+  Auth is via the same Slack v0 HMAC-SHA256 signature verification.
+  Slack sends application/x-www-form-urlencoded with a `payload` JSON field.
+  """
+  def interactions(conn, params) do
+    with :ok <- verify_slack_request(conn) do
+      payload_json = Map.get(params, "payload", "{}")
+      payload = Jason.decode!(payload_json)
+      actions = Map.get(payload, "actions", [])
+
+      Enum.each(actions, fn action ->
+        action_id = Map.get(action, "action_id", "")
+        value = Map.get(action, "value", "")
+
+        case action_id do
+          "guild_hold" ->
+            case Guild.Control.hold(value) do
+              {:ok, _msg} -> :ok
+              {:error, reason} -> Logger.warning("interactions hold error: #{inspect(reason)}")
+            end
+
+          "guild_abandon" ->
+            case Guild.Control.abandon(value) do
+              {:ok, _msg} -> :ok
+              {:error, reason} -> Logger.warning("interactions abandon error: #{inspect(reason)}")
+            end
+
+          "guild_view" ->
+            :ok
+
+          other ->
+            Logger.debug("SlackController.interactions: unknown action_id #{inspect(other)}")
+        end
+      end)
+
+      conn
+      |> put_resp_content_type("application/json")
+      |> send_resp(200, Jason.encode!(%{response_action: "clear"}))
+    else
+      {:error, reason} ->
+        Logger.warning("SlackController.interactions: signature verification failed: #{reason}")
+        forbidden(conn)
+    end
+  end
+
+  # Shared HMAC + timestamp verification for all Slack endpoints.
+  defp verify_slack_request(conn) do
     signing_secret = Application.get_env(:guild, :slack_signing_secret)
 
     if is_nil(signing_secret) or signing_secret == "" do
       Logger.warning("SlackController: SLACK_SIGNING_SECRET not configured, rejecting request")
-      forbidden(conn)
+      {:error, "signing secret not configured"}
     else
       ts = conn |> get_req_header("x-slack-request-timestamp") |> List.first("")
       slack_sig = conn |> get_req_header("x-slack-signature") |> List.first("")
       raw_body = Map.get(conn.private, :raw_body, "")
 
-      with :ok <- verify_timestamp(ts),
-           :ok <- verify_signature(signing_secret, ts, raw_body, slack_sig) do
-        dispatch(conn, params)
-      else
-        {:error, reason} ->
-          Logger.warning("SlackController: signature verification failed: #{reason}")
-          forbidden(conn)
+      with :ok <- verify_timestamp(ts) do
+        verify_signature(signing_secret, ts, raw_body, slack_sig)
       end
     end
   end

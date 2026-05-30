@@ -35,6 +35,22 @@ defmodule GuildWeb.SlackControllerTest do
     |> post(~p"/slack/commands", body_text)
   end
 
+  defp slack_interactions_conn(conn, payload_map, opts \\ []) do
+    payload_json = Jason.encode!(payload_map)
+    body_text = URI.encode_query(%{"payload" => payload_json})
+    ts = to_string(Keyword.get(opts, :ts, System.system_time(:second)))
+    secret = Keyword.get(opts, :secret, @test_secret)
+
+    base = "v0:#{ts}:#{body_text}"
+    sig = "v0=" <> Base.encode16(:crypto.mac(:hmac, :sha256, secret, base), case: :lower)
+
+    conn
+    |> put_req_header("content-type", "application/x-www-form-urlencoded")
+    |> put_req_header("x-slack-request-timestamp", ts)
+    |> put_req_header("x-slack-signature", sig)
+    |> post(~p"/slack/interactions", body_text)
+  end
+
   describe "signature verification" do
     test "valid signature returns 200", %{conn: conn} do
       insert_thread(101)
@@ -120,6 +136,76 @@ defmodule GuildWeb.SlackControllerTest do
       updated = Repo.get!(Thread, thread.id)
       assert updated.state == "abandoned"
       assert is_nil(updated.owner)
+    end
+  end
+
+  describe "interactions endpoint" do
+    test "valid guild_hold action sets thread.held = true", %{conn: conn} do
+      thread = insert_thread(801)
+
+      payload = %{
+        "actions" => [
+          %{"action_id" => "guild_hold", "value" => "801"}
+        ]
+      }
+
+      conn = slack_interactions_conn(conn, payload)
+      assert conn.status == 200
+
+      updated = Repo.get!(Thread, thread.id)
+      assert updated.held == true
+    end
+
+    test "valid guild_abandon action transitions thread to abandoned", %{conn: conn} do
+      thread = insert_thread(802, "executing")
+
+      payload = %{
+        "actions" => [
+          %{"action_id" => "guild_abandon", "value" => "802"}
+        ]
+      }
+
+      conn = slack_interactions_conn(conn, payload)
+      assert conn.status == 200
+
+      updated = Repo.get!(Thread, thread.id)
+      assert updated.state == "abandoned"
+    end
+
+    test "guild_view action is a no-op, returns 200", %{conn: conn} do
+      thread = insert_thread(803)
+
+      payload = %{
+        "actions" => [
+          %{"action_id" => "guild_view", "value" => thread.id}
+        ]
+      }
+
+      conn = slack_interactions_conn(conn, payload)
+      assert conn.status == 200
+    end
+
+    test "invalid signature returns 403", %{conn: conn} do
+      payload = %{"actions" => []}
+      conn = slack_interactions_conn(conn, payload, secret: "wrong_secret")
+      assert conn.status == 403
+    end
+
+    test "missing SLACK_SIGNING_SECRET returns 403", %{conn: conn} do
+      Application.delete_env(:guild, :slack_signing_secret)
+
+      payload_json = Jason.encode!(%{"actions" => []})
+      body_text = URI.encode_query(%{"payload" => payload_json})
+      ts = to_string(System.system_time(:second))
+
+      conn =
+        conn
+        |> put_req_header("content-type", "application/x-www-form-urlencoded")
+        |> put_req_header("x-slack-request-timestamp", ts)
+        |> put_req_header("x-slack-signature", "v0=fake")
+        |> post(~p"/slack/interactions", body_text)
+
+      assert conn.status == 403
     end
   end
 end
