@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g8-slice-plan** — captain-picard decomposing [`plan/g8-framing/framing.md`](plan/g8-framing/framing.md) (Operate Guild from the UI — discover, configure, use) into `plan/g8/slice-plan.md`. Driver reviews/approves before any slice dispatches. (G7 closed + deployed + dry-run-verified; see Gated → G7.)
+- **g8-slice-plan** — PR open for driver review. [`plan/g8/slice-plan.md`](plan/g8/slice-plan.md) decomposes G8 into 4 slices: (1) landing page + `/admin` shell + integration status dashboard; (2) repos CRUD + setup-readiness banner; (3) workers list/add + inline thread hold/resume/abandon; (4) driver dry-run + targeted fixes (judgment-gated close). No ADRs required — all open architectural questions settled inline (controllers over LiveView for CRUD, query-based last-activity, soft-disable for repo delete, secret-presence-only for status). Awaiting driver approval before any slice is dispatched.
 
 ## Done
 
