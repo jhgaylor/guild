@@ -8,10 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **G7 slice plan** — PR open, awaiting driver approval before any slice is dispatched. See [`plan/g7/slice-plan.md`](plan/g7/slice-plan.md) (4 slices: multi-repo live-fire → UI polish → demo runbook → driver dry-run). No implementation until driver approves.
+- **g7-slice-1** — in flight (Guild-side engineering only). `Guild.Release.add_repo/3` callable via `bin/guild eval`; two-repos routing smoke test; `docs/add-repo.md` operator runbook. Operator-completed steps (Jake picks repo + installs App + creates first `bot-ready` issue) follow merge + deploy. Branch: `g7/slice-1-multi-repo`.
 
 ## Done
 
+- **g7-slice-plan** — PR #49 merged (c4327f4). G7 (Demo readiness) decomposed into 4 slices: (1) multi-repo live-fire on a second real repo, (2) operator UI polish (incl. G6 Slice 4 deferred timeline), (3) demo runbook + onboarding refresh, (4) driver dry-run + targeted fixes (judgment-gated close). No ADRs required. Driver approved.
 - **g6-adr-0016** — PR #47 merged (e14672e). Bidirectional sync: Linear inbound record-only (no state cycles); Slack Events record-all with `stop_sign`→hold mapping via `slack_message` artifact (channel/ts encoded in `Artifact.url` as `slack://channel/ts` — no migration). Linear-Signature HMAC + reuse of the shared v0 `verify_slack_request` helper (incl. for url_verification — defense in depth). Driver approved.
 - **g6-slice-2** — PR #46 merged (ea50360). Slack interactive buttons + operator digest: `Guild.Adapters.Slack.post_message/2` now accepts `:blocks`; Pass A/B post Block Kit messages with `Hold`/`Abandon` buttons on `:pr_open` and `View thread` on `:done`. New `POST /slack/interactions` action in `SlackController` reusing the v0 HMAC via a shared `verify_slack_request/1` helper (parses `payload` JSON, routes by `action_id` → `Guild.Control`). `Guild.Digest.send_digest/0` summarizes state counts + top-3 worst-stuck threads; wired via the built-in `Oban.Plugins.Cron` daily at 09:00 UTC (no new dep). 342 tests green.
 
