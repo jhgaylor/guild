@@ -270,6 +270,7 @@ defmodule Guild.Reconcile do
           join: a in Artifact,
           on: a.thread_id == t.id and a.artifact_type == "fountain_conversation",
           where: t.state in ["done", "abandoned"],
+          where: not a.terminated,
           select: {t, a}
       )
 
@@ -280,13 +281,16 @@ defmodule Guild.Reconcile do
         case Guild.Adapters.Fountain.get_status(conv_id) do
           {:ok, :terminated} ->
             Logger.debug(
-              "Thread #{thread.id}: conversation #{conv_id} already terminated, skipping"
+              "Thread #{thread.id}: conversation #{conv_id} already terminated, flipping flag"
             )
+
+            Repo.update!(Artifact.changeset(artifact, %{terminated: true}))
 
           {:ok, _status} ->
             case Guild.Adapters.Fountain.terminate_conversation(conv_id) do
               {:ok, :terminated} ->
                 Logger.info("Thread #{thread.id}: terminated conversation #{conv_id}")
+                Repo.update!(Artifact.changeset(artifact, %{terminated: true}))
 
               {:error, tier, reason} ->
                 Logger.warning(
@@ -314,19 +318,24 @@ defmodule Guild.Reconcile do
     executing_cutoff = DateTime.add(now, -@executing_stuck_after_ms, :millisecond)
     pr_open_cutoff = DateTime.add(now, -@pr_open_stuck_after_ms, :millisecond)
 
+    # Use state_entered_at when available; fall back to updated_at for pre-existing rows.
     stuck_threads =
       Repo.all(
         from t in Thread,
           where:
-            (t.state == "executing" and t.updated_at < ^executing_cutoff) or
-              (t.state == "pr_open" and t.updated_at < ^pr_open_cutoff),
+            (t.state == "executing" and
+               coalesce(t.state_entered_at, t.updated_at) < ^executing_cutoff) or
+              (t.state == "pr_open" and
+                 coalesce(t.state_entered_at, t.updated_at) < ^pr_open_cutoff),
           where: is_nil(t.last_alerted_at) or t.last_alerted_at < ^cooldown_cutoff,
           where: t.held == false
       )
 
     Enum.each(stuck_threads, fn thread ->
       try do
-        age_seconds = DateTime.diff(now, thread.updated_at)
+        # Age is computed from state_entered_at when available, else updated_at.
+        reference_time = thread.state_entered_at || thread.updated_at
+        age_seconds = DateTime.diff(now, reference_time)
         age_hours = div(age_seconds, 3600)
 
         Guild.Adapters.Slack.post_message(

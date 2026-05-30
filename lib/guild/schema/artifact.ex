@@ -12,13 +12,14 @@ defmodule Guild.Schema.Artifact do
     field :external_id, :string
     field :url, :string
     field :metadata, :map
+    field :terminated, :boolean, default: false
 
     timestamps(type: :utc_datetime_usec, updated_at: false)
   end
 
   def changeset(artifact, attrs) do
     artifact
-    |> cast(attrs, [:thread_id, :artifact_type, :source, :external_id, :url, :metadata])
+    |> cast(attrs, [:thread_id, :artifact_type, :source, :external_id, :url, :metadata, :terminated])
     |> validate_required([:thread_id, :artifact_type, :source, :external_id])
     |> unique_constraint([:source, :external_id])
   end

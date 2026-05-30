@@ -51,9 +51,9 @@ defmodule Guild.Primitives.Meta do
         {:ok, new_state} ->
           attrs =
             if new_state in [:done, :abandoned] do
-              %{state: to_string(new_state), owner: nil}
+              %{state: to_string(new_state), owner: nil, state_entered_at: DateTime.utc_now()}
             else
-              %{state: to_string(new_state)}
+              %{state: to_string(new_state), state_entered_at: DateTime.utc_now()}
             end
 
           changeset = Thread.changeset(thread, attrs)

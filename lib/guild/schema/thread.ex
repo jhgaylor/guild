@@ -17,6 +17,7 @@ defmodule Guild.Schema.Thread do
     field :linear_issue_id, :string
     field :last_alerted_at, :utc_datetime
     field :held, :boolean, default: false
+    field :state_entered_at, :utc_datetime_usec
 
     has_many :events, Guild.Schema.Event, foreign_key: :thread_id
     has_many :context_notes, Guild.Schema.ContextNote, foreign_key: :thread_id
@@ -28,7 +29,7 @@ defmodule Guild.Schema.Thread do
 
   def changeset(thread, attrs) do
     thread
-    |> cast(attrs, [:anchor_type, :anchor_id, :anchor_url, :state, :owner, :parent_thread_id, :linear_issue_id, :last_alerted_at, :held])
+    |> cast(attrs, [:anchor_type, :anchor_id, :anchor_url, :state, :owner, :parent_thread_id, :linear_issue_id, :last_alerted_at, :held, :state_entered_at])
     |> validate_required([:anchor_type, :anchor_id, :state])
     |> validate_inclusion(:state, @valid_states)
     |> unique_constraint([:anchor_type, :anchor_id])
