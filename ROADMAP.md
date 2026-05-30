@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g6-slice-plan** — captain-picard decomposing [`plan/g6-framing/framing.md`](plan/g6-framing/framing.md) (Adapter depth + polish) into `plan/g6/slice-plan.md`. Driver reviews/approves before any slice dispatches. (G5 closed + deployed; see Gated → G5.)
+- **G6 slice plan** — PR open, awaiting driver approval before any slice is dispatched.
 
 ## Done
 
