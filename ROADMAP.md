@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g6-slice-3** — in flight. Bidirectional sync per ADR 0016: `POST /linear/webhooks` (record-only Linear → `linear.*` Event rows) + `POST /slack/events` (record + `stop_sign` reaction on Guild messages → `Guild.Control.hold`) + `slack_message` artifact captures channel+ts on outbound post. Branch: `g6/slice-3-bidirectional-sync`.
+- **g6-slice-3 deploy + G6 close** — PR #48 merged; CI building → deploy + G6 closing verification. (Slice 4 is UI-only stretch — deferring to G7 per the plan.)
 
 ## Done
 
