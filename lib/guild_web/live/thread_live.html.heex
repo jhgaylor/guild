@@ -28,6 +28,13 @@
       <dd class="timestamp"><%= GuildWeb.Format.time(@thread.inserted_at) %></dd>
       <dt>Updated</dt>
       <dd class="timestamp"><%= GuildWeb.Format.time(@thread.updated_at) %></dd>
+      <%= if @thread.slack_thread_ts do %>
+        <dt>Slack</dt>
+        <dd>
+          <a href={"https://slack.com/app_redirect?channel=#{@thread.slack_channel}&message=#{@thread.slack_thread_ts}"}
+             target="_blank" rel="noopener">Open in Slack</a>
+        </dd>
+      <% end %>
     </dl>
   </section>
 

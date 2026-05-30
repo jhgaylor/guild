@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g9-slice-2** — in flight. Inbound association (reactions on parent OR reply → work thread; message-event replies → Event with thread_id set) + "Open in Slack" link on `/threads/:id`. Branch: `g9/slice-2-inbound-association`. _(Slice 1 PR #59 merged; CI building → deploy.)_
+- **g9-slice-2** — in progress on branch `g9/slice-2-inbound-association`. Brief written at `plan/g9-slice-2/general-purpose-engineer-brief.md`. Inbound association (reactions on parent OR reply → work thread; message-event replies → Event with thread_id set) + "Open in Slack" link on `/threads/:id`. _(Slice 1 PR #59 merged; CI building → deploy.)_
 
 ## Done
 

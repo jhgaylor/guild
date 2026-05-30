@@ -101,24 +101,40 @@ defmodule GuildWeb.SlackController do
   defp dispatch_event(conn, %{"type" => "event_callback", "event" => event} = params) do
     event_type = Map.get(event, "type", "unknown")
 
+    # Resolve work thread ONCE per event — used for both the audit Event row
+    # (so reactions/messages associated to a work thread show on /threads/:id)
+    # and for any state-driving handler below (e.g. stop_sign → hold).
+    thread_id =
+      case event do
+        %{"type" => "message", "channel" => channel, "ts" => ts, "thread_ts" => thread_ts} ->
+          case resolve_work_thread(channel, ts, thread_ts) do
+            {:ok, tid} -> tid
+            :not_found -> nil
+          end
+
+        %{"type" => "reaction_added", "item" => %{"type" => "message", "channel" => channel, "ts" => item_ts} = item} ->
+          case resolve_work_thread(channel, item_ts, Map.get(item, "thread_ts")) do
+            {:ok, tid} -> tid
+            :not_found -> nil
+          end
+
+        _ ->
+          nil
+      end
+
     # ADR 0016: every verified Slack event is recorded, including state-driving ones.
-    record_slack_event(event_type, params)
+    record_slack_event(event_type, params, thread_id)
 
-    # Then optionally drive state: stop_sign reaction on a Guild-owned slack_message → hold.
+    # Then optionally drive state.
     case event do
-      %{
-        "type" => "reaction_added",
-        "reaction" => "stop_sign",
-        "item" => %{"type" => "message", "channel" => channel, "ts" => ts}
-      } ->
-        url = "slack://" <> channel <> "/" <> ts
-
-        case Repo.one(from a in Schema.Artifact, where: a.url == ^url, limit: 1) do
+      %{"type" => "reaction_added", "reaction" => "stop_sign", "item" => %{"type" => "message"}} ->
+        case thread_id do
           nil ->
+            Logger.debug("SlackController.events: reaction_added stop_sign on non-Guild message, no-op")
             :ok
 
-          artifact ->
-            case Guild.Control.hold(artifact.thread_id) do
+          tid ->
+            case Guild.Control.hold(tid) do
               {:ok, _} -> :ok
               {:error, reason} -> Logger.warning("SlackController.events: hold error: #{inspect(reason)}")
             end
@@ -138,13 +154,13 @@ defmodule GuildWeb.SlackController do
   end
 
   # Insert an Event row for a verified Slack event (ADR 0016: record all).
-  defp record_slack_event(event_type, raw_payload) do
+  defp record_slack_event(event_type, raw_payload, thread_id \\ nil) do
     attrs = %{
       source: "slack",
       event_type: "slack." <> event_type,
       occurred_at: DateTime.utc_now(),
       raw_payload: raw_payload,
-      thread_id: nil,
+      thread_id: thread_id,
       idempotency_key: "slack:#{event_type}:#{Ecto.UUID.generate()}"
     }
 
@@ -153,6 +169,44 @@ defmodule GuildWeb.SlackController do
     case Repo.insert(changeset, on_conflict: :nothing, conflict_target: :idempotency_key) do
       {:ok, _} -> :ok
       {:error, cs} -> Logger.warning("SlackController.events: failed to insert event: #{inspect(cs.errors)}")
+    end
+  end
+
+  # Resolve the work thread for an inbound Slack message using three strategies in order:
+  # (a) artifact lookup by slack://channel/ts URL
+  # (b) thread column lookup where slack_channel + slack_thread_ts == ts
+  # (c) thread column lookup where slack_channel + slack_thread_ts == thread_ts_opt (parent ts)
+  defp resolve_work_thread(channel, ts, thread_ts_opt) do
+    url = "slack://" <> channel <> "/" <> ts
+
+    # Strategy (a): artifact lookup by url
+    case Repo.one(from a in Schema.Artifact,
+           where: a.artifact_type == "slack_message" and a.url == ^url,
+           limit: 1) do
+      %Schema.Artifact{thread_id: thread_id} ->
+        {:ok, thread_id}
+
+      nil ->
+        # Strategy (b): thread column lookup by ts
+        case Repo.one(from t in Schema.Thread,
+               where: t.slack_channel == ^channel and t.slack_thread_ts == ^ts,
+               limit: 1) do
+          %Schema.Thread{id: thread_id} ->
+            {:ok, thread_id}
+
+          nil ->
+            # Strategy (c): thread column lookup by thread_ts_opt (parent ts)
+            if thread_ts_opt do
+              case Repo.one(from t in Schema.Thread,
+                     where: t.slack_channel == ^channel and t.slack_thread_ts == ^thread_ts_opt,
+                     limit: 1) do
+                %Schema.Thread{id: thread_id} -> {:ok, thread_id}
+                nil -> :not_found
+              end
+            else
+              :not_found
+            end
+        end
     end
   end
 

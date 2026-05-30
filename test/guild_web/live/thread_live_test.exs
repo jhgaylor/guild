@@ -129,6 +129,38 @@ defmodule GuildWeb.ThreadLiveTest do
     end
   end
 
+  # Test F — "Open in Slack" link present when slack_thread_ts set
+  test "shows Open in Slack link when slack_thread_ts is set", %{conn: conn} do
+    {:ok, thread} =
+      %Guild.Schema.Thread{}
+      |> Guild.Schema.Thread.changeset(%{
+        anchor_type: "github_issue",
+        anchor_id: "slack-link-test-1",
+        state: "executing",
+        slack_channel: "C123",
+        slack_thread_ts: "111.222"
+      })
+      |> Guild.Repo.insert()
+
+    {:ok, _view, html} = conn |> with_auth() |> live(~p"/threads/#{thread.id}")
+    assert html =~ "app_redirect?channel=C123" and html =~ "111.222"
+  end
+
+  # Test G — link absent when slack_thread_ts nil
+  test "does not show Open in Slack link when slack_thread_ts is nil", %{conn: conn} do
+    {:ok, thread} =
+      %Guild.Schema.Thread{}
+      |> Guild.Schema.Thread.changeset(%{
+        anchor_type: "github_issue",
+        anchor_id: "slack-link-test-2",
+        state: "executing"
+      })
+      |> Guild.Repo.insert()
+
+    {:ok, _view, html} = conn |> with_auth() |> live(~p"/threads/#{thread.id}")
+    refute html =~ "Open in Slack"
+  end
+
   test "GET /threads/:id shows stuck warning banner for over-threshold executing thread",
        %{conn: conn} do
     {:ok, stuck_thread} =
