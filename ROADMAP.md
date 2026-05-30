@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g6-slice-3 ADR** — captain-picard drafting ADR 0016 (bidirectional sync — Linear webhook + Slack Events). _(Slice 2 PR #46 merged; CI building → deploy.)_
+- **g6-slice-3 ADR** — G6 Slice 3 — ADR 0016 bidirectional sync (PR open, awaiting driver approval)
 
 ## Done
 
