@@ -25,6 +25,15 @@ defmodule GuildWeb.Router do
     post "/webhooks/github", WebhookController, :receive
   end
 
+  # Alias for the GitHub App webhook URL configured WITHOUT the /api prefix.
+  # The canonical path is /api/webhooks/github; this alias makes the App webhook
+  # work whether the App settings point at /webhooks/github or /api/webhooks/github.
+  scope "/", GuildWeb do
+    pipe_through :api
+
+    post "/webhooks/github", WebhookController, :receive
+  end
+
   # Slack slash commands, interactions, and events — auth via Slack v0 HMAC signature, NOT the :auth pipeline.
   scope "/slack", GuildWeb do
     post "/commands", SlackController, :commands
