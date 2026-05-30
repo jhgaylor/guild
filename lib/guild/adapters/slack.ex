@@ -47,6 +47,7 @@ defmodule Guild.Adapters.Slack do
       payload =
         %{channel: channel, text: text}
         |> maybe_put_blocks(opts)
+        |> maybe_put_thread_ts(opts)
 
       body = Jason.encode!(payload)
 
@@ -89,6 +90,13 @@ defmodule Guild.Adapters.Slack do
     case Keyword.get(opts, :blocks) do
       nil -> payload
       blocks -> Map.put(payload, :blocks, blocks)
+    end
+  end
+
+  defp maybe_put_thread_ts(payload, opts) do
+    case Keyword.get(opts, :thread_ts) do
+      nil -> payload
+      thread_ts -> Map.put(payload, "thread_ts", thread_ts)
     end
   end
 end

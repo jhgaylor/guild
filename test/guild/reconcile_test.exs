@@ -598,6 +598,215 @@ defmodule Guild.ReconcileTest do
     end
   end
 
+  describe "pass_a — stores slack_thread_ts anchor on thread" do
+    setup %{bypass: _fountain_bypass} do
+      slack_bypass = Bypass.open()
+      Application.put_env(:guild, :slack_bot_token, "xoxb-test")
+      Application.put_env(:guild, :slack_channel_id, "C_TEST")
+      Application.put_env(:guild, :slack_api_url, "http://localhost:#{slack_bypass.port}/api/chat.postMessage")
+      on_exit(fn ->
+        Application.delete_env(:guild, :slack_bot_token)
+        Application.delete_env(:guild, :slack_channel_id)
+        Application.delete_env(:guild, :slack_api_url)
+      end)
+      {:ok, slack_bypass: slack_bypass}
+    end
+
+    test "stores slack_channel and slack_thread_ts on thread after first pr_open post",
+         %{slack_bypass: slack_bypass} do
+      thread = insert_thread("executing")
+      insert_seed_event(thread.id)
+      insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-anchor-a")
+
+      Guild.GitHub.TestAdapter.configure(:list_pull_requests, {:ok, [
+        %{"number" => 60, "html_url" => "https://github.com/owner/test-repo/pull/60", "body" => "Closes #3"}
+      ]})
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true, channel: "C123", ts: "111.222"}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      updated = Repo.get!(Thread, thread.id)
+      assert updated.slack_channel == "C123"
+      assert updated.slack_thread_ts == "111.222"
+    end
+
+    test "pass A does NOT send thread_ts in post_message payload (it is the anchor)",
+         %{slack_bypass: slack_bypass} do
+      thread = insert_thread("executing")
+      insert_seed_event(thread.id)
+      insert_artifact(thread.id, "fountain_conversation", source: "fountain", external_id: "conv-anchor-b")
+
+      Guild.GitHub.TestAdapter.configure(:list_pull_requests, {:ok, [
+        %{"number" => 61, "html_url" => "https://github.com/owner/test-repo/pull/61", "body" => "Closes #3"}
+      ]})
+
+      received = Agent.start_link(fn -> nil end) |> elem(1)
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        Agent.update(received, fn _ -> decoded end)
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true, channel: "C123", ts: "111.333"}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      msg = Agent.get(received, & &1)
+      refute Map.has_key?(msg, "thread_ts")
+    end
+  end
+
+  describe "pass_b — thread_ts threading" do
+    setup %{bypass: _fountain_bypass} do
+      slack_bypass = Bypass.open()
+      Application.put_env(:guild, :slack_bot_token, "xoxb-test")
+      Application.put_env(:guild, :slack_channel_id, "C_TEST")
+      Application.put_env(:guild, :slack_api_url, "http://localhost:#{slack_bypass.port}/api/chat.postMessage")
+      on_exit(fn ->
+        Application.delete_env(:guild, :slack_bot_token)
+        Application.delete_env(:guild, :slack_channel_id)
+        Application.delete_env(:guild, :slack_api_url)
+      end)
+      {:ok, slack_bypass: slack_bypass}
+    end
+
+    test "pass B sends thread_ts in payload when thread has slack_thread_ts",
+         %{slack_bypass: slack_bypass} do
+      thread =
+        %Thread{}
+        |> Thread.changeset(%{
+          anchor_type: "github_issue",
+          anchor_id: "200",
+          state: "pr_open",
+          slack_channel: "C123",
+          slack_thread_ts: "111.222"
+        })
+        |> Repo.insert!()
+
+      insert_artifact(thread.id, "pull_request",
+        source: "github",
+        external_id: "200",
+        url: "https://github.com/owner/test-repo/pull/200"
+      )
+
+      Repo.insert!(%Event{
+        source: "github",
+        event_type: "pull_request.merged",
+        occurred_at: DateTime.utc_now(),
+        raw_payload: %{"action" => "closed", "pull_request" => %{"merged" => true}},
+        idempotency_key: "pr_merged:200:#{System.unique_integer()}",
+        thread_id: thread.id
+      })
+
+      received = Agent.start_link(fn -> nil end) |> elem(1)
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        Agent.update(received, fn _ -> decoded end)
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      msg = Agent.get(received, & &1)
+      assert msg["thread_ts"] == "111.222"
+    end
+
+    test "pass B does NOT send thread_ts when thread.slack_thread_ts is nil (fallback top-level)",
+         %{slack_bypass: slack_bypass} do
+      thread = insert_thread("pr_open")
+
+      insert_artifact(thread.id, "pull_request",
+        source: "github",
+        external_id: "201",
+        url: "https://github.com/owner/test-repo/pull/201"
+      )
+
+      Repo.insert!(%Event{
+        source: "github",
+        event_type: "pull_request.merged",
+        occurred_at: DateTime.utc_now(),
+        raw_payload: %{"action" => "closed", "pull_request" => %{"merged" => true}},
+        idempotency_key: "pr_merged:201:#{System.unique_integer()}",
+        thread_id: thread.id
+      })
+
+      received = Agent.start_link(fn -> nil end) |> elem(1)
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        Agent.update(received, fn _ -> decoded end)
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      msg = Agent.get(received, & &1)
+      refute Map.has_key?(msg, "thread_ts")
+    end
+  end
+
+  describe "pass_c — thread_ts threading for stuck alerts" do
+    setup %{bypass: _fountain_bypass} do
+      slack_bypass = Bypass.open()
+      Application.put_env(:guild, :slack_bot_token, "xoxb-test")
+      Application.put_env(:guild, :slack_channel_id, "C_TEST")
+      Application.put_env(:guild, :slack_api_url, "http://localhost:#{slack_bypass.port}/api/chat.postMessage")
+      on_exit(fn ->
+        Application.delete_env(:guild, :slack_bot_token)
+        Application.delete_env(:guild, :slack_channel_id)
+        Application.delete_env(:guild, :slack_api_url)
+      end)
+      {:ok, slack_bypass: slack_bypass}
+    end
+
+    test "pass C sends thread_ts in Slack payload when thread has slack_thread_ts",
+         %{slack_bypass: slack_bypass} do
+      thread =
+        %Thread{}
+        |> Thread.changeset(%{
+          anchor_type: "github_issue",
+          anchor_id: "stuck-300",
+          state: "executing",
+          slack_channel: "C123",
+          slack_thread_ts: "999.111"
+        })
+        |> Repo.insert!()
+
+      past = DateTime.add(DateTime.utc_now(), -3 * 3600, :second)
+      Repo.update_all(from(t in Thread, where: t.id == ^thread.id), set: [updated_at: past])
+
+      received = Agent.start_link(fn -> nil end) |> elem(1)
+
+      Bypass.expect_once(slack_bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        Agent.update(received, fn _ -> decoded end)
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(%{ok: true}))
+      end)
+
+      :ok = Guild.Reconcile.reconcile_all()
+
+      msg = Agent.get(received, & &1)
+      assert msg["thread_ts"] == "999.111"
+    end
+  end
+
   describe "pass_d - terminate Fountain conversations for done/abandoned threads" do
     test "terminates an active conversation for a done thread", %{bypass: bypass} do
       thread = insert_thread("done")

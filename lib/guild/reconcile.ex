@@ -237,6 +237,10 @@ defmodule Guild.Reconcile do
                   {:error, cs} -> Logger.warning("Thread #{thread.id}: failed to insert slack_message artifact: #{inspect(cs.errors)}")
                 end
 
+                if is_nil(thread.slack_thread_ts) do
+                  Guild.Repo.update(Ecto.Changeset.change(thread, slack_channel: c, slack_thread_ts: ts))
+                end
+
               _ ->
                 :ok
             end
@@ -312,10 +316,12 @@ defmodule Guild.Reconcile do
             }
           ]
 
+          thread_ts_opt = if thread.slack_thread_ts, do: [thread_ts: thread.slack_thread_ts], else: []
+
           case Guild.Adapters.Slack.post_message(
                  nil,
                  "Thread ##{thread.id}: :done",
-                 blocks: blocks
+                 Keyword.merge([blocks: blocks], thread_ts_opt)
                ) do
             {:ok, %{channel: c, ts: ts}} when not is_nil(c) and not is_nil(ts) ->
               slack_url = "slack://" <> c <> "/" <> ts
@@ -430,8 +436,12 @@ defmodule Guild.Reconcile do
         age_seconds = DateTime.diff(now, reference_time)
         age_hours = div(age_seconds, 3600)
 
+        thread_ts_opt = if thread.slack_thread_ts, do: [thread_ts: thread.slack_thread_ts], else: []
+
         Guild.Adapters.Slack.post_message(
-          "Thread ##{thread.id} appears stuck: state=#{thread.state}, age=#{age_hours}h"
+          nil,
+          "Thread ##{thread.id} appears stuck: state=#{thread.state}, age=#{age_hours}h",
+          thread_ts_opt
         )
 
         Repo.update!(Thread.changeset(thread, %{last_alerted_at: now}))
