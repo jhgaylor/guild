@@ -8,7 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **G9 Slice 1** — in progress on branch `g9/slice-1-outbound-threading`. Implementing: `slack_thread_ts`/`slack_channel` columns (migration + backfill + composite index), `thread_ts:` opt in `Guild.Adapters.Slack.post_message`, Reconcile Pass A stores anchor ts after first `:pr_open` post, Pass B and Pass C pass `thread_ts:` when set (fallback top-level when nil). Tests required. Brief at [`plan/g9-slice-1/general-purpose-engineer-brief.md`](plan/g9-slice-1/general-purpose-engineer-brief.md).
+- **g9-slice-2** — in flight. Inbound association (reactions on parent OR reply → work thread; message-event replies → Event with thread_id set) + "Open in Slack" link on `/threads/:id`. Branch: `g9/slice-2-inbound-association`. _(Slice 1 PR #59 merged; CI building → deploy.)_
+
+## Done
+
+- **g9-slice-1** — PR #59 merged (1d19add). Outbound Slack thread continuity: migration adds `slack_thread_ts` + `slack_channel` columns to `threads` (composite index for Slice 2 lookup + defensive backfill from existing `slack_message` artifact URLs); `Guild.Adapters.Slack.post_message/3` accepts `thread_ts:` opt and threads it through to `chat.postMessage`; Pass A (`:pr_open`) stores `slack_channel` + `slack_thread_ts` after the first successful post; Pass B (`:done`) and Pass C (stuck alerts) reply in the work thread's Slack thread when set, fall back to top-level when nil. 415 tests green.
 
 ## Done
 
