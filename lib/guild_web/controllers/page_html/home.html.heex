@@ -1,11 +1,32 @@
 <div class="landing">
-  <h1>Guild</h1>
-  <p>
-    Guild is an autonomous agent that watches your GitHub repos for bot-ready issues, claims them, and ships PRs.
-    Operators steer it from Slack and observe it in the UI.
-  </p>
-  <ul class="landing__nav">
-    <li><a href={~p"/threads"}>Threads</a></li>
-    <li><a href={~p"/jobs"}>Jobs</a></li>
-  </ul>
+  <section class="landing__hero">
+    <h1>Guild</h1>
+    <p class="landing__tagline">
+      Guild watches your repos for bot-ready issues, claims them,
+      and ships PRs — steered from Slack, observed in here.
+    </p>
+    <a href="https://github.com/jhgaylor/guild/blob/main/docs/setup.md" class="landing__cta">Try it on your repo</a>
+  </section>
+
+  <section class="landing__features">
+    <ul>
+      <li>
+        <strong>Repo claiming</strong> — Guild monitors GitHub repositories and automatically claims bot-ready issues.
+        Manage repos in <a href={~p"/admin/repos"}>/admin/repos</a>.
+      </li>
+      <li>
+        <strong>Slack control plane</strong> — Operators steer Guild from Slack: hold, release, or redirect work in real time.
+      </li>
+      <li>
+        <strong>Durable Oban queue</strong> — All jobs are persisted and retried via Oban. Inspect the queue at <a href={~p"/jobs"}>/jobs</a>.
+      </li>
+      <li>
+        <strong>Multi-repo support</strong> — One Guild instance watches many repositories simultaneously.
+      </li>
+      <li>
+        <strong>Observable thread timeline</strong> — Every decision, event, and artifact is recorded. Explore threads at <a href={~p"/threads"}>/threads</a>.
+        Admin tools at <a href={~p"/admin"}>/admin</a>.
+      </li>
+    </ul>
+  </section>
 </div>

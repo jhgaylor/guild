@@ -5,7 +5,7 @@ defmodule GuildWeb.PageControllerTest do
     conn = get(conn, ~p"/")
     body = html_response(conn, 200)
     assert body =~ "Guild"
-    assert body =~ "autonomous agent"
+    assert body =~ "watches your repos"
     assert body =~ "bot-ready issues"
   end
 

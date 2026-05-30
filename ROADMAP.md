@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g8-slice-plan** — PR open for driver review. [`plan/g8/slice-plan.md`](plan/g8/slice-plan.md) decomposes G8 into 4 slices: (1) landing page + `/admin` shell + integration status dashboard; (2) repos CRUD + setup-readiness banner; (3) workers list/add + inline thread hold/resume/abandon; (4) driver dry-run + targeted fixes (judgment-gated close). No ADRs required — all open architectural questions settled inline (controllers over LiveView for CRUD, query-based last-activity, soft-disable for repo delete, secret-presence-only for status). Awaiting driver approval before any slice is dispatched.
+- **g8-slice-1** — In progress on branch `g8/slice-1-admin-shell`. Landing page + `/admin` shell + integration status dashboard. Brief at [`plan/g8-slice-1/general-purpose-engineer-brief.md`](plan/g8-slice-1/general-purpose-engineer-brief.md). Engineer dispatched via Fountain.
 
 ## Done
 
