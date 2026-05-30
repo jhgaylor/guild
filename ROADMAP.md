@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g9-slice-plan** — captain-picard decomposing [`plan/g9-framing/framing.md`](plan/g9-framing/framing.md) (one Slack thread per Guild work thread + take Slack live for the first time) into `plan/g9/slice-plan.md`. Driver reviews/approves before any slice dispatches. (G8 closed + dry-run-verified; see Gated → G8.)
+- **g9-slice-plan** — PR open for driver review. [`plan/g9/slice-plan.md`](plan/g9/slice-plan.md) decomposes G9 into 4 slices: (1) `slack_thread_ts`/`slack_channel` columns + `post_message` `thread_ts:` + Reconcile A/B/C wiring; (2) inbound resolver (replies + reactions on replies → work thread) + "Open in Slack" link on `/threads/:id`; (3) `docs/slack-setup.md` runbook + `Guild.Release.slack_ping/0` sanity-check (operator-gated: Jake provisions Slack App + secrets); (4) driver live dry-run + targeted fixes (judgment-gated close). No ADRs required — all open questions settled inline. Awaiting driver approval before any slice dispatches.
 
 ## Done
 
