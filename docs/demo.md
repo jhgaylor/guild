@@ -14,7 +14,7 @@ Guild is a platform for autonomous workers that participate in the software deve
 On the configured repository, create a new issue and apply the `bot-ready` label. Keep the title and description concrete so the AI engineer has something to implement.
 
 **Step 2 — Watch `/threads`.**
-Open the Guild UI at `https://<your-deploy-host>/threads`. Within a few seconds the new thread appears. Refresh and watch the state column move from `:new` → `:claiming` → `:executing`.
+Open the Guild UI at `https://<your-deploy-host>/threads`. Within a few seconds the new thread appears. Refresh and watch the state column move from `:noticed` → `:claimed` → `:executing`. (Those transitions are fast — the **Recent activity** strip at the top of the page captures the last few state changes so you can point at them after they have already happened.)
 
 **Step 3 — Inspect `/jobs`.**
 Open `https://<your-deploy-host>/jobs` (the Oban dashboard). A `ClaimWorker` job appears in the `:claims` queue and quickly moves to processed. This is the moment Guild won the advisory lock and dispatched the Fountain conversation.
