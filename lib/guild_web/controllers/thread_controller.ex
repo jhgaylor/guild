@@ -12,6 +12,7 @@ defmodule GuildWeb.ThreadController do
           limit: 5
       )
 
-    render(conn, :index, threads: threads, recent: recent)
+    gaps = Guild.Setup.gaps()
+    render(conn, :index, threads: threads, recent: recent, gaps: gaps)
   end
 end

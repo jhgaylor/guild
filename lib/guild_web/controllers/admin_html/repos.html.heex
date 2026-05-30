@@ -1,5 +1,61 @@
 <div class="container">
   <h1 class="page-title">Repos</h1>
   <p class="page-subtitle"><a href={~p"/admin"}>← Admin</a></p>
-  <p>Repos management coming in Slice 2</p>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Repo</th>
+        <th>Status</th>
+        <th>Worker</th>
+        <th>Last Claim</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <%= for repo <- @repos do %>
+        <tr>
+          <td><%= repo.full_name %></td>
+          <td>
+            <%= if repo.enabled do %>
+              <span class="badge badge--green">enabled</span>
+            <% else %>
+              <span class="badge badge--red">disabled</span>
+            <% end %>
+          </td>
+          <td><%= repo.worker_id %></td>
+          <td>never</td>
+          <td>
+            <form method="post" action={~p"/admin/repos/#{URI.encode_www_form(repo.full_name)}/toggle"} style="display:inline">
+              <input type="hidden" name="_method" value="patch" />
+              <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+              <button type="submit"><%= if repo.enabled, do: "Disable", else: "Enable" %></button>
+            </form>
+            <%= if repo.enabled do %>
+              <form method="post" action={~p"/admin/repos/#{URI.encode_www_form(repo.full_name)}"} style="display:inline">
+                <input type="hidden" name="_method" value="delete" />
+                <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+                <button type="submit" data-confirm="Disable this repo?">Soft-disable</button>
+              </form>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <h2>Add Repo</h2>
+  <.form :let={f} for={@changeset} action={~p"/admin/repos"} method="post">
+    <.input field={f[:full_name]} label="Full name (owner/repo)" />
+    <div>
+      <label for="worker_id">Worker</label>
+      <select name="worker_id" id="worker_id">
+        <%= for worker <- @workers do %>
+          <option value={worker.worker_id}><%= worker.worker_id %></option>
+        <% end %>
+        <option value="default">default</option>
+      </select>
+    </div>
+    <button type="submit">Add repo</button>
+  </.form>
 </div>

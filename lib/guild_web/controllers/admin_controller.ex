@@ -7,7 +7,54 @@ defmodule GuildWeb.AdminController do
   end
 
   def repos(conn, _params) do
-    render(conn, :repos)
+    repos = Guild.Repo.all(Guild.Schema.Repo)
+    workers = Guild.Repo.all(Guild.Schema.Worker)
+    changeset = Ecto.Changeset.change(%Guild.Schema.Repo{})
+    render(conn, :repos, repos: repos, workers: workers, changeset: changeset)
+  end
+
+  def create_repo(conn, params) do
+    full_name = String.trim(params["full_name"] || "")
+    worker_id = case String.trim(params["worker_id"] || "") do
+      "" -> "default"
+      wid -> wid
+    end
+
+    if full_name == "" do
+      repos = Guild.Repo.all(Guild.Schema.Repo)
+      workers = Guild.Repo.all(Guild.Schema.Worker)
+      changeset =
+        Guild.Schema.Repo.changeset(%Guild.Schema.Repo{}, %{full_name: "", worker_id: worker_id})
+        |> Ecto.Changeset.add_error(:full_name, "can't be blank")
+        |> Map.put(:action, :insert)
+      conn
+      |> put_status(200)
+      |> render(:repos, repos: repos, workers: workers, changeset: changeset)
+    else
+      changeset = Guild.Schema.Repo.changeset(%Guild.Schema.Repo{}, %{
+        full_name: full_name,
+        worker_id: worker_id,
+        enabled: true
+      })
+      Guild.Repo.insert(changeset, on_conflict: :nothing, conflict_target: :full_name)
+      redirect(conn, to: ~p"/admin/repos")
+    end
+  end
+
+  def toggle_repo(conn, %{"encoded_name" => encoded}) do
+    full_name = URI.decode_www_form(encoded)
+    repo = Guild.Repo.get!(Guild.Schema.Repo, full_name)
+    changeset = Ecto.Changeset.change(repo, enabled: !repo.enabled)
+    Guild.Repo.update!(changeset)
+    redirect(conn, to: ~p"/admin/repos")
+  end
+
+  def disable_repo(conn, %{"encoded_name" => encoded}) do
+    full_name = URI.decode_www_form(encoded)
+    repo = Guild.Repo.get!(Guild.Schema.Repo, full_name)
+    changeset = Ecto.Changeset.change(repo, enabled: false)
+    Guild.Repo.update!(changeset)
+    redirect(conn, to: ~p"/admin/repos")
   end
 
   def workers(conn, _params) do

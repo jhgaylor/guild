@@ -67,6 +67,9 @@ defmodule GuildWeb.Router do
     scope "/admin" do
       get "/", AdminController, :index
       get "/repos", AdminController, :repos
+      post "/repos", AdminController, :create_repo
+      patch "/repos/:encoded_name/toggle", AdminController, :toggle_repo
+      delete "/repos/:encoded_name", AdminController, :disable_repo
       get "/workers", AdminController, :workers
       get "/integrations", AdminController, :integrations
     end
