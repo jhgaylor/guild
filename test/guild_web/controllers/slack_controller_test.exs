@@ -294,6 +294,12 @@ defmodule GuildWeb.SlackControllerTest do
       updated = Repo.get!(Thread, thread.id)
       assert updated.held == true
 
+      # ADR 0016: the verified event must also be recorded for audit, even when it drives state.
+      assert Repo.exists?(
+               from e in Event,
+                 where: e.source == "slack" and e.event_type == "slack.reaction_added"
+             )
+
       _ = artifact
     end
 

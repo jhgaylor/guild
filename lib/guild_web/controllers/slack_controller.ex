@@ -99,6 +99,12 @@ defmodule GuildWeb.SlackController do
   end
 
   defp dispatch_event(conn, %{"type" => "event_callback", "event" => event} = params) do
+    event_type = Map.get(event, "type", "unknown")
+
+    # ADR 0016: every verified Slack event is recorded, including state-driving ones.
+    record_slack_event(event_type, params)
+
+    # Then optionally drive state: stop_sign reaction on a Guild-owned slack_message → hold.
     case event do
       %{
         "type" => "reaction_added",
@@ -106,30 +112,33 @@ defmodule GuildWeb.SlackController do
         "item" => %{"type" => "message", "channel" => channel, "ts" => ts}
       } ->
         url = "slack://" <> channel <> "/" <> ts
-        artifact = Repo.one(from a in Schema.Artifact, where: a.url == ^url, limit: 1)
 
-        if artifact do
-          case Guild.Control.hold(artifact.thread_id) do
-            {:ok, _} -> :ok
-            {:error, reason} -> Logger.warning("SlackController.events: hold error: #{inspect(reason)}")
-          end
+        case Repo.one(from a in Schema.Artifact, where: a.url == ^url, limit: 1) do
+          nil ->
+            :ok
 
-          conn |> send_resp(200, "")
-        else
-          insert_slack_event(conn, Map.get(event, "type", "unknown"), params)
+          artifact ->
+            case Guild.Control.hold(artifact.thread_id) do
+              {:ok, _} -> :ok
+              {:error, reason} -> Logger.warning("SlackController.events: hold error: #{inspect(reason)}")
+            end
         end
 
-      event_inner ->
-        insert_slack_event(conn, Map.get(event_inner, "type", "unknown"), params)
+      _ ->
+        :ok
     end
+
+    send_resp(conn, 200, "")
   end
 
   defp dispatch_event(conn, params) do
     event_type = get_in(params, ["event", "type"]) || Map.get(params, "type", "unknown")
-    insert_slack_event(conn, event_type, params)
+    record_slack_event(event_type, params)
+    send_resp(conn, 200, "")
   end
 
-  defp insert_slack_event(conn, event_type, raw_payload) do
+  # Insert an Event row for a verified Slack event (ADR 0016: record all).
+  defp record_slack_event(event_type, raw_payload) do
     attrs = %{
       source: "slack",
       event_type: "slack." <> event_type,
@@ -142,8 +151,8 @@ defmodule GuildWeb.SlackController do
     changeset = %Schema.Event{} |> Schema.Event.changeset(attrs)
 
     case Repo.insert(changeset, on_conflict: :nothing, conflict_target: :idempotency_key) do
-      {:ok, _} -> conn |> send_resp(200, "")
-      {:error, _} -> conn |> send_resp(500, "") |> halt()
+      {:ok, _} -> :ok
+      {:error, cs} -> Logger.warning("SlackController.events: failed to insert event: #{inspect(cs.errors)}")
     end
   end
 
