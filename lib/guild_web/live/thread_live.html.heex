@@ -31,6 +31,39 @@
     </dl>
   </section>
 
+  <%!-- Thread action buttons — plain HTML POST forms, not LiveView events --%>
+  <% terminal_states = ["done", "abandoned"] %>
+  <% is_terminal = @thread.state in terminal_states %>
+
+  <%= unless is_terminal do %>
+    <div class="thread-actions" style="margin: 1rem 0; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <%= unless @thread.held do %>
+        <% active_states = ["executing", "pr_open"] %>
+        <%= if @thread.state in active_states do %>
+          <form action={~p"/threads/#{@thread.id}/hold"} method="post">
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+            <button type="submit" class="btn btn--warning">Hold</button>
+          </form>
+        <% end %>
+      <% end %>
+
+      <%= if @thread.held do %>
+        <form action={~p"/threads/#{@thread.id}/resume"} method="post">
+          <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+          <button type="submit" class="btn btn--primary">Resume</button>
+        </form>
+      <% end %>
+
+      <form action={~p"/threads/#{@thread.id}/abandon"} method="post">
+        <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+        <button type="submit" class="btn btn--danger"
+          onclick="return confirm('Abandon this thread? This cannot be undone.')">
+          Abandon
+        </button>
+      </form>
+    </div>
+  <% end %>
+
   <h2 class="section-title">Timeline (<%= length(@timeline) %>)</h2>
   <%= if Enum.empty?(@timeline) do %>
     <p class="empty-state">No activity yet.</p>
