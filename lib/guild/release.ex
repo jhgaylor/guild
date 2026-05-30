@@ -55,6 +55,36 @@ defmodule Guild.Release do
     end
   end
 
+  def add_repo(full_name, worker_id \\ "default", enabled \\ true) do
+    require Logger
+    load_app()
+
+    {:ok, _, _} =
+      Ecto.Migrator.with_repo(Guild.Repo, fn _repo ->
+        changeset =
+          Guild.Schema.Repo.changeset(%Guild.Schema.Repo{}, %{
+            full_name: full_name,
+            worker_id: worker_id,
+            enabled: enabled
+          })
+
+        case Guild.Repo.insert(changeset,
+               on_conflict: :nothing,
+               conflict_target: :full_name
+             ) do
+          {:ok, _} ->
+            Logger.info("add_repo: inserted #{inspect(full_name)} -> worker=#{inspect(worker_id)}")
+
+          {:error, changeset} ->
+            Logger.info(
+              "add_repo: #{inspect(full_name)} already exists (or changeset error: #{inspect(changeset.errors)})"
+            )
+        end
+      end)
+
+    :ok
+  end
+
   def rollback(repo, version) do
     load_app()
     {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :down, to: version))
