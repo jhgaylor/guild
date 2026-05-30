@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g9-slice-plan** — PR open for driver review. [`plan/g9/slice-plan.md`](plan/g9/slice-plan.md) decomposes G9 into 4 slices: (1) `slack_thread_ts`/`slack_channel` columns + `post_message` `thread_ts:` + Reconcile A/B/C wiring; (2) inbound resolver (replies + reactions on replies → work thread) + "Open in Slack" link on `/threads/:id`; (3) `docs/slack-setup.md` runbook + `Guild.Release.slack_ping/0` sanity-check (operator-gated: Jake provisions Slack App + secrets); (4) driver live dry-run + targeted fixes (judgment-gated close). No ADRs required — all open questions settled inline. Awaiting driver approval before any slice dispatches.
+- **G9 Slice 1** — in progress on branch `g9/slice-1-outbound-threading`. Implementing: `slack_thread_ts`/`slack_channel` columns (migration + backfill + composite index), `thread_ts:` opt in `Guild.Adapters.Slack.post_message`, Reconcile Pass A stores anchor ts after first `:pr_open` post, Pass B and Pass C pass `thread_ts:` when set (fallback top-level when nil). Tests required. Brief at [`plan/g9-slice-1/general-purpose-engineer-brief.md`](plan/g9-slice-1/general-purpose-engineer-brief.md).
 
 ## Done
 
