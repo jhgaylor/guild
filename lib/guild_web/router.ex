@@ -25,10 +25,16 @@ defmodule GuildWeb.Router do
     post "/webhooks/github", WebhookController, :receive
   end
 
-  # Slack slash commands and interactions — auth via Slack v0 HMAC signature, NOT the :auth pipeline.
+  # Slack slash commands, interactions, and events — auth via Slack v0 HMAC signature, NOT the :auth pipeline.
   scope "/slack", GuildWeb do
     post "/commands", SlackController, :commands
     post "/interactions", SlackController, :interactions
+    post "/events", SlackController, :events
+  end
+
+  # Linear webhooks — auth via HMAC-SHA256 signature, NOT the :auth pipeline.
+  scope "/linear", GuildWeb do
+    post "/webhooks", LinearController, :webhooks
   end
 
   scope "/", GuildWeb do

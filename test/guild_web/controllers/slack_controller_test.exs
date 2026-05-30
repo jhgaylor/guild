@@ -1,8 +1,9 @@
 defmodule GuildWeb.SlackControllerTest do
   use GuildWeb.ConnCase, async: false
 
+  import Ecto.Query
   alias Guild.Repo
-  alias Guild.Schema.Thread
+  alias Guild.Schema.{Thread, Artifact, Event}
 
   @test_secret "test_slack_signing_secret"
 
@@ -206,6 +207,141 @@ defmodule GuildWeb.SlackControllerTest do
         |> post(~p"/slack/interactions", body_text)
 
       assert conn.status == 403
+    end
+  end
+
+  # Helper: build a signed Slack events POST
+  defp slack_events_conn(conn, body_map, opts \\ []) do
+    body_text = Jason.encode!(body_map)
+    ts = to_string(Keyword.get(opts, :ts, System.system_time(:second)))
+    secret = Keyword.get(opts, :secret, @test_secret)
+
+    base = "v0:#{ts}:#{body_text}"
+    sig = "v0=" <> Base.encode16(:crypto.mac(:hmac, :sha256, secret, base), case: :lower)
+
+    conn
+    |> put_req_header("content-type", "application/json")
+    |> put_req_header("x-slack-request-timestamp", ts)
+    |> put_req_header("x-slack-signature", sig)
+    |> post(~p"/slack/events", body_text)
+  end
+
+  describe "events endpoint — signature verification" do
+    test "invalid signature returns 403", %{conn: conn} do
+      body = %{"type" => "url_verification", "challenge" => "abc123"}
+      conn = slack_events_conn(conn, body, secret: "wrong_secret")
+      assert conn.status == 403
+    end
+
+    test "missing SLACK_SIGNING_SECRET returns 403", %{conn: conn} do
+      Application.delete_env(:guild, :slack_signing_secret)
+      body_text = Jason.encode!(%{"type" => "url_verification", "challenge" => "abc"})
+      ts = to_string(System.system_time(:second))
+
+      conn =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> put_req_header("x-slack-request-timestamp", ts)
+        |> put_req_header("x-slack-signature", "v0=fake")
+        |> post(~p"/slack/events", body_text)
+
+      assert conn.status == 403
+    end
+  end
+
+  describe "events endpoint — url_verification" do
+    test "valid sig + url_verification returns 200 with challenge value", %{conn: conn} do
+      body = %{"type" => "url_verification", "challenge" => "my_challenge_token"}
+      conn = slack_events_conn(conn, body)
+
+      assert conn.status == 200
+      assert conn.resp_body == "my_challenge_token"
+    end
+  end
+
+  describe "events endpoint — reaction_added stop_sign" do
+    test "valid sig + reaction_added stop_sign on slack_message artifact sets thread.held true", %{conn: conn} do
+      thread = insert_thread(901)
+
+      {:ok, artifact} =
+        %Artifact{}
+        |> Artifact.changeset(%{
+          thread_id: thread.id,
+          artifact_type: "slack_message",
+          source: "slack",
+          external_id: "1234567890.123456",
+          url: "slack://C_CHAN_1/1234567890.123456"
+        })
+        |> Repo.insert()
+
+      body = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "reaction_added",
+          "reaction" => "stop_sign",
+          "item" => %{
+            "type" => "message",
+            "channel" => "C_CHAN_1",
+            "ts" => "1234567890.123456"
+          }
+        }
+      }
+
+      conn = slack_events_conn(conn, body)
+
+      assert conn.status == 200
+
+      updated = Repo.get!(Thread, thread.id)
+      assert updated.held == true
+
+      _ = artifact
+    end
+
+    test "valid sig + reaction_added stop_sign on non-Guild message inserts Event row, held unchanged", %{conn: conn} do
+      thread = insert_thread(902)
+
+      body = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "reaction_added",
+          "reaction" => "stop_sign",
+          "item" => %{
+            "type" => "message",
+            "channel" => "C_NO_MATCH",
+            "ts" => "9999999999.000000"
+          }
+        }
+      }
+
+      conn = slack_events_conn(conn, body)
+
+      assert conn.status == 200
+
+      updated = Repo.get!(Thread, thread.id)
+      assert updated.held == false
+
+      event = Repo.one(from e in Event, where: e.event_type == "slack.reaction_added")
+      assert event != nil
+    end
+  end
+
+  describe "events endpoint — other events" do
+    test "valid sig + unknown event type inserts Event row with slack. prefix", %{conn: conn} do
+      body = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "message",
+          "text" => "hello"
+        }
+      }
+
+      conn = slack_events_conn(conn, body)
+
+      assert conn.status == 200
+
+      event = Repo.one(from e in Event, where: e.event_type == "slack.message")
+      assert event != nil
+      assert event.source == "slack"
     end
   end
 end

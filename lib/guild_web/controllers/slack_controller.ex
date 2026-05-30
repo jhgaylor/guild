@@ -2,6 +2,9 @@ defmodule GuildWeb.SlackController do
   use GuildWeb, :controller
 
   require Logger
+  import Ecto.Query, only: [from: 2]
+
+  alias Guild.{Repo, Schema}
 
   # Reject requests whose timestamp deviates more than 5 minutes from now.
   @max_age_seconds 300
@@ -66,6 +69,81 @@ defmodule GuildWeb.SlackController do
       {:error, reason} ->
         Logger.warning("SlackController.interactions: signature verification failed: #{reason}")
         forbidden(conn)
+    end
+  end
+
+  @doc """
+  Handle POST /slack/events (Slack Events API).
+
+  Auth is via the same Slack v0 HMAC-SHA256 signature verification.
+  Dispatches:
+    - url_verification: returns the challenge value as plain text.
+    - reaction_added stop_sign on a message: looks up the slack_message artifact
+      and calls Guild.Control.hold/1 on the owning thread.
+    - All other events: inserts an Event row with event_type "slack.<type>".
+  """
+  def events(conn, params) do
+    with :ok <- verify_slack_request(conn) do
+      dispatch_event(conn, params)
+    else
+      {:error, reason} ->
+        Logger.warning("SlackController.events: signature verification failed: #{reason}")
+        forbidden(conn)
+    end
+  end
+
+  defp dispatch_event(conn, %{"type" => "url_verification", "challenge" => challenge}) do
+    conn
+    |> put_resp_content_type("text/plain")
+    |> send_resp(200, challenge)
+  end
+
+  defp dispatch_event(conn, %{"type" => "event_callback", "event" => event} = params) do
+    case event do
+      %{
+        "type" => "reaction_added",
+        "reaction" => "stop_sign",
+        "item" => %{"type" => "message", "channel" => channel, "ts" => ts}
+      } ->
+        url = "slack://" <> channel <> "/" <> ts
+        artifact = Repo.one(from a in Schema.Artifact, where: a.url == ^url, limit: 1)
+
+        if artifact do
+          case Guild.Control.hold(artifact.thread_id) do
+            {:ok, _} -> :ok
+            {:error, reason} -> Logger.warning("SlackController.events: hold error: #{inspect(reason)}")
+          end
+
+          conn |> send_resp(200, "")
+        else
+          insert_slack_event(conn, Map.get(event, "type", "unknown"), params)
+        end
+
+      event_inner ->
+        insert_slack_event(conn, Map.get(event_inner, "type", "unknown"), params)
+    end
+  end
+
+  defp dispatch_event(conn, params) do
+    event_type = get_in(params, ["event", "type"]) || Map.get(params, "type", "unknown")
+    insert_slack_event(conn, event_type, params)
+  end
+
+  defp insert_slack_event(conn, event_type, raw_payload) do
+    attrs = %{
+      source: "slack",
+      event_type: "slack." <> event_type,
+      occurred_at: DateTime.utc_now(),
+      raw_payload: raw_payload,
+      thread_id: nil,
+      idempotency_key: "slack:#{event_type}:#{Ecto.UUID.generate()}"
+    }
+
+    changeset = %Schema.Event{} |> Schema.Event.changeset(attrs)
+
+    case Repo.insert(changeset, on_conflict: :nothing, conflict_target: :idempotency_key) do
+      {:ok, _} -> conn |> send_resp(200, "")
+      {:error, _} -> conn |> send_resp(500, "") |> halt()
     end
   end
 

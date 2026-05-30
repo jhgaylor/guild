@@ -215,11 +215,31 @@ defmodule Guild.Reconcile do
               }
             ]
 
-            Guild.Adapters.Slack.post_message(
-              nil,
-              "Thread ##{thread.id}: :pr_open — #{pr_url}",
-              blocks: blocks
-            )
+            case Guild.Adapters.Slack.post_message(
+                   nil,
+                   "Thread ##{thread.id}: :pr_open — #{pr_url}",
+                   blocks: blocks
+                 ) do
+              {:ok, %{channel: c, ts: ts}} when not is_nil(c) and not is_nil(ts) ->
+                slack_url = "slack://" <> c <> "/" <> ts
+
+                %Artifact{}
+                |> Artifact.changeset(%{
+                  thread_id: thread.id,
+                  artifact_type: "slack_message",
+                  source: "slack",
+                  external_id: ts,
+                  url: slack_url
+                })
+                |> Repo.insert(on_conflict: :nothing, conflict_target: [:source, :external_id])
+                |> case do
+                  {:ok, _} -> :ok
+                  {:error, cs} -> Logger.warning("Thread #{thread.id}: failed to insert slack_message artifact: #{inspect(cs.errors)}")
+                end
+
+              _ ->
+                :ok
+            end
 
           {:error, tier, reason} ->
             Logger.warning(
@@ -292,11 +312,31 @@ defmodule Guild.Reconcile do
             }
           ]
 
-          Guild.Adapters.Slack.post_message(
-            nil,
-            "Thread ##{thread.id}: :done",
-            blocks: blocks
-          )
+          case Guild.Adapters.Slack.post_message(
+                 nil,
+                 "Thread ##{thread.id}: :done",
+                 blocks: blocks
+               ) do
+            {:ok, %{channel: c, ts: ts}} when not is_nil(c) and not is_nil(ts) ->
+              slack_url = "slack://" <> c <> "/" <> ts
+
+              %Artifact{}
+              |> Artifact.changeset(%{
+                thread_id: thread.id,
+                artifact_type: "slack_message",
+                source: "slack",
+                external_id: ts,
+                url: slack_url
+              })
+              |> Repo.insert(on_conflict: :nothing, conflict_target: [:source, :external_id])
+              |> case do
+                {:ok, _} -> :ok
+                {:error, cs} -> Logger.warning("Thread #{thread.id}: failed to insert slack_message artifact: #{inspect(cs.errors)}")
+              end
+
+            _ ->
+              :ok
+          end
 
           if thread.linear_issue_id do
             Guild.Adapters.Linear.update_issue(thread.linear_issue_id, %{
