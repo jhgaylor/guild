@@ -8,10 +8,11 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g6-slice-3 ADR** — G6 Slice 3 — ADR 0016 bidirectional sync (PR open, awaiting driver approval)
+- **g6-slice-3** — in flight. Bidirectional sync per ADR 0016: `POST /linear/webhooks` (record-only Linear → `linear.*` Event rows) + `POST /slack/events` (record + `stop_sign` reaction on Guild messages → `Guild.Control.hold`) + `slack_message` artifact captures channel+ts on outbound post. Branch: `g6/slice-3-bidirectional-sync`.
 
 ## Done
 
+- **g6-adr-0016** — PR #47 merged (e14672e). Bidirectional sync: Linear inbound record-only (no state cycles); Slack Events record-all with `stop_sign`→hold mapping via `slack_message` artifact (channel/ts encoded in `Artifact.url` as `slack://channel/ts` — no migration). Linear-Signature HMAC + reuse of the shared v0 `verify_slack_request` helper (incl. for url_verification — defense in depth). Driver approved.
 - **g6-slice-2** — PR #46 merged (ea50360). Slack interactive buttons + operator digest: `Guild.Adapters.Slack.post_message/2` now accepts `:blocks`; Pass A/B post Block Kit messages with `Hold`/`Abandon` buttons on `:pr_open` and `View thread` on `:done`. New `POST /slack/interactions` action in `SlackController` reusing the v0 HMAC via a shared `verify_slack_request/1` helper (parses `payload` JSON, routes by `action_id` → `Guild.Control`). `Guild.Digest.send_digest/0` summarizes state counts + top-3 worst-stuck threads; wired via the built-in `Oban.Plugins.Cron` daily at 09:00 UTC (no new dep). 342 tests green.
 
 - **g6-slice-1** — PR #45 merged (6c22b0c). Polish foundations: Linear `:executing → In Progress` wired in `Guild.Claiming` (uses `state_id(:in_progress)` helper, `:stateId` key, graceful no-op when unconfigured); Pass D `terminated` artifact flag (skips already-flagged via `where: not a.terminated`, flips on success / already-`:terminated` status); `state_entered_at` column set in `Meta.update_thread_state` on every transition, Pass C uses `coalesce(state_entered_at, updated_at)`; OTP 28.0.1 → 28.1.1 base-image bump (kills the regex-recompile perf warning). Driver added missing tests pinning Pass D's flag-flip + skip behavior. 330 tests green.
