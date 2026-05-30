@@ -63,6 +63,13 @@ defmodule GuildWeb.Router do
     live_session :authenticated, on_mount: {GuildWeb.OperatorAuth, :require_auth} do
       live "/threads/:id", ThreadLive, :show
     end
+
+    scope "/admin" do
+      get "/", AdminController, :index
+      get "/repos", AdminController, :repos
+      get "/workers", AdminController, :workers
+      get "/integrations", AdminController, :integrations
+    end
   end
 
   # Other scopes may use custom stacks.

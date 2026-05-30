@@ -1,0 +1,90 @@
+<div class="container">
+  <h1 class="page-title">Integrations</h1>
+  <p class="page-subtitle"><a href={~p"/admin"}>← Admin</a></p>
+
+  <div class="integration-cards">
+
+    <%!-- GitHub App card --%>
+    <% {github_status, github_details} = @github %>
+    <div class={"integration-card integration-card--#{github_status}"}>
+      <h2>GitHub App</h2>
+      <p class="integration-status">
+        Status: <strong><%= status_label(github_status) %></strong>
+      </p>
+      <ul class="integration-details">
+        <li>App ID: <%= if github_details.app_id_set, do: "set", else: "not set" %></li>
+        <li>Private Key: <%= if github_details.private_key_set, do: "set", else: "not set" %></li>
+        <li>Installation ID: <%= if github_details.installation_id_set, do: "set", else: "not set" %></li>
+        <li>Webhook Secret: <%= if github_details.webhook_secret_set, do: "set", else: "not set" %></li>
+      </ul>
+      <p class="integration-last-activity">
+        Last webhook:
+        <%= if github_details.last_event do %>
+          <%= GuildWeb.Format.time_ago(github_details.last_event.occurred_at) %>
+        <% else %>
+          no events yet
+        <% end %>
+      </p>
+    </div>
+
+    <%!-- Slack card --%>
+    <% {slack_status, slack_details} = @slack %>
+    <div class={"integration-card integration-card--#{slack_status}"}>
+      <h2>Slack</h2>
+      <p class="integration-status">
+        Status: <strong><%= slack_status_label(slack_status, slack_details) %></strong>
+      </p>
+      <ul class="integration-details">
+        <li>Signing Secret: <%= if slack_details.signing_secret_set, do: "set", else: "not set" %></li>
+        <li>Bot Token: <%= if slack_details.bot_token_set, do: "set", else: "not set" %></li>
+        <li>Channel ID: <%= if slack_details.channel_id_set, do: "set", else: "not set" %></li>
+      </ul>
+      <p class="integration-last-activity">
+        Last outbound:
+        <%= if slack_details.last_artifact do %>
+          <%= GuildWeb.Format.time_ago(slack_details.last_artifact.inserted_at) %>
+        <% else %>
+          no messages yet
+        <% end %>
+      </p>
+    </div>
+
+    <%!-- Linear card --%>
+    <% {linear_status, linear_details} = @linear %>
+    <div class={"integration-card integration-card--#{linear_status}"}>
+      <h2>Linear</h2>
+      <p class="integration-status">
+        Status: <strong><%= status_label(linear_status) %></strong>
+      </p>
+      <ul class="integration-details">
+        <li>API Key: <%= if linear_details.api_key_set, do: "set", else: "not set" %></li>
+        <li>Team ID: <%= if linear_details.team_id_set, do: "set", else: "not set" %></li>
+        <li>State In-Progress ID: <%= if linear_details.state_in_progress_set, do: "set", else: "not set" %></li>
+        <li>State Done ID: <%= if linear_details.state_done_set, do: "set", else: "not set" %></li>
+      </ul>
+      <p class="integration-last-activity">
+        Last outbound:
+        <%= if linear_details.last_thread do %>
+          <%= GuildWeb.Format.time_ago(linear_details.last_thread.updated_at) %>
+        <% else %>
+          no issues yet
+        <% end %>
+      </p>
+    </div>
+
+    <%!-- Fountain card --%>
+    <% {fountain_status, fountain_details} = @fountain %>
+    <div class={"integration-card integration-card--#{fountain_status}"}>
+      <h2>Fountain</h2>
+      <p class="integration-status">
+        Status: <strong><%= status_label(fountain_status) %></strong>
+      </p>
+      <ul class="integration-details">
+        <li>API Key: <%= if fountain_details.api_key_set, do: "set", else: "not set" %></li>
+        <li>Base URL: <%= if fountain_details.base_url_set, do: "set", else: "not set" %></li>
+        <li>Implementer Agent ID: <%= if fountain_details.agent_id_set, do: "set", else: "not set" %></li>
+      </ul>
+    </div>
+
+  </div>
+</div>
