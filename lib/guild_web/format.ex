@@ -24,6 +24,28 @@ defmodule GuildWeb.Format do
   def time(other), do: to_string(other)
 
   @doc """
+  Human-readable elapsed time: "just now", "5m ago", "3h ago", "2d ago".
+  """
+  def time_ago(nil), do: "unknown"
+
+  def time_ago(%DateTime{} = dt) do
+    seconds = DateTime.diff(DateTime.utc_now(), dt)
+
+    cond do
+      seconds < 60 -> "just now"
+      seconds < 3_600 -> "#{div(seconds, 60)}m ago"
+      seconds < 86_400 -> "#{div(seconds, 3_600)}h ago"
+      true -> "#{div(seconds, 86_400)}d ago"
+    end
+  end
+
+  def time_ago(%NaiveDateTime{} = ndt) do
+    ndt |> DateTime.from_naive!("Etc/UTC") |> time_ago()
+  end
+
+  def time_ago(other), do: to_string(other)
+
+  @doc """
   First 8 chars of a UUID for compact table display.
   """
   def short_id(nil), do: ""

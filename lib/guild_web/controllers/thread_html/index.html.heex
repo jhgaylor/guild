@@ -1,6 +1,27 @@
 <Layouts.flash_group flash={@flash} />
 <div class="container">
   <h1 class="page-title">Threads</h1>
+
+  <%= unless Enum.empty?(@recent) do %>
+    <section class="recent-activity" style="margin-bottom: 1.5rem;">
+      <h2 class="section-title" style="font-size: 1rem; margin-bottom: 0.5rem;">Recent Activity</h2>
+      <ul style="list-style: none; padding: 0; margin: 0;">
+        <%= for thread <- @recent do %>
+          <%
+            ref = thread.state_entered_at || thread.updated_at
+          %>
+          <li style="display: flex; gap: 0.75rem; padding: 0.25rem 0; align-items: center;">
+            <a href={~p"/threads/#{thread.id}"} style="font-family: monospace; font-size: 0.85em;">
+              <%= GuildWeb.Format.anchor_label(thread) %>
+            </a>
+            <span class={"badge badge--#{thread.state}"}><%= thread.state %></span>
+            <span class="muted" style="font-size: 0.8em;"><%= GuildWeb.Format.time_ago(ref) %></span>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+
   <p class="page-subtitle">
     <%= length(@threads) %> threads, most recently updated first.
   </p>
