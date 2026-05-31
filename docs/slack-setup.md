@@ -204,3 +204,120 @@ corrupted or expired token is the second most common cause.
 `/guild` slash commands and interactive buttons require `SLACK_SIGNING_SECRET`. Confirm
 it is set and matches the value from Slack's **Basic Information → App Credentials** page.
 The signing secret is used to verify every inbound Slack request; a mismatch returns `403`.
+
+---
+
+## Activating the Slack Inbox (G10)
+
+After Steps 1–8 are in place (Guild posting + reacting in Slack), the G10 inbox
+adds *listening*: Guild reads top-level messages in enabled channels and decides
+whether each is `:new_work`, `:refers_to_existing`, or `:noise` via an LLM
+classifier (ADR 0017). Default rollout is **dry-run** — Guild records every
+classification with reasoning on `/admin/slack-inbox` but takes no Slack/GitHub
+action until you flip the flag off.
+
+### Inbox Step A — Get the Bot User ID
+
+The self-loop guard needs Guild's own bot user ID so it doesn't classify its own
+posts. Find it via the Slack API:
+
+```bash
+curl -s -H "Authorization: Bearer xoxb-..." https://slack.com/api/auth.test | jq -r .user_id
+```
+
+The value starts with `U` (e.g. `U08XYZ123`). Save it for Step B.
+
+### Inbox Step B — Provision Inbox Env Vars
+
+Add the five inbox keys to the cluster Secret. Same idempotent `kubectl patch`
+pattern as Step 5:
+
+```bash
+OPENROUTER_API_KEY_B64=$(echo -n "sk-or-..." | base64)
+SLACK_BOT_USER_ID_B64=$(echo -n "U08XYZ123" | base64)
+SLACK_INBOX_DRY_RUN_B64=$(echo -n "true" | base64)
+SLACK_INBOX_CONFIDENCE_THRESHOLD_B64=$(echo -n "0.7" | base64)
+OPENROUTER_CLASSIFIER_MODEL_B64=$(echo -n "openai/gpt-4o-mini" | base64)
+
+kubectl patch secret guild-app-secrets -n guild \
+  --type='json' \
+  -p="[
+    {\"op\":\"add\",\"path\":\"/data/OPENROUTER_API_KEY\",\"value\":\"${OPENROUTER_API_KEY_B64}\"},
+    {\"op\":\"add\",\"path\":\"/data/SLACK_BOT_USER_ID\",\"value\":\"${SLACK_BOT_USER_ID_B64}\"},
+    {\"op\":\"add\",\"path\":\"/data/SLACK_INBOX_DRY_RUN\",\"value\":\"${SLACK_INBOX_DRY_RUN_B64}\"},
+    {\"op\":\"add\",\"path\":\"/data/SLACK_INBOX_CONFIDENCE_THRESHOLD\",\"value\":\"${SLACK_INBOX_CONFIDENCE_THRESHOLD_B64}\"},
+    {\"op\":\"add\",\"path\":\"/data/OPENROUTER_CLASSIFIER_MODEL\",\"value\":\"${OPENROUTER_CLASSIFIER_MODEL_B64}\"}
+  ]"
+```
+
+Get an OpenRouter API key at [openrouter.ai/keys](https://openrouter.ai/keys).
+Expected cost: <$1/month at single-team usage on `gpt-4o-mini` (ADR 0017).
+
+### Inbox Step C — Roll the Deployment
+
+```bash
+kubectl rollout restart deployment/guild -n guild
+kubectl rollout status deployment/guild -n guild
+```
+
+Visit `/admin/integrations` — the OpenRouter card should show **✓ ready**.
+
+### Inbox Step D — Enable a Channel
+
+In the Guild UI, go to **`/admin/slack-channels`** and add the channel:
+
+- **Channel ID**: the same `C...` ID from Step 4
+- **Default Repo**: the GitHub repo where `:new_work` issues should be filed
+  (the bot must be configured for this repo via `/admin/repos`)
+- Save with **enabled: true**
+
+### Inbox Step E — Dry-Run Validation Period
+
+Recommended: ≥3 days, or until you trust the classifier.
+
+Post these in the configured Slack channel and check `/admin/slack-inbox` for
+the classification + reasoning:
+
+| Post | Expected verdict |
+|---|---|
+| "can you add a CHANGELOG entry for last week's release?" | `new_work`, confidence > 0.7 |
+| "did that typo fix ship?" (with a matching open thread) | `refers_to_existing` matching the thread |
+| "good morning everyone" | `noise` |
+| (Guild's own `:done` reply or confirmation post) | **No row** — self-loop guard fired |
+
+If a classification is wrong, use the **File as new work** or **Mark as noise**
+override on `/admin/slack-inbox`. The override fires immediately regardless of
+the dry-run flag.
+
+Adjust `SLACK_INBOX_CONFIDENCE_THRESHOLD` in the Secret if classifications are
+too aggressive (raise it) or too timid (lower it).
+
+### Inbox Step F — Go Live
+
+When dry-run validation feels right, flip the flag:
+
+```bash
+SLACK_INBOX_DRY_RUN_B64=$(echo -n "false" | base64)
+kubectl patch secret guild-app-secrets -n guild \
+  --type='json' \
+  -p="[{\"op\":\"replace\",\"path\":\"/data/SLACK_INBOX_DRY_RUN\",\"value\":\"${SLACK_INBOX_DRY_RUN_B64}\"}]"
+kubectl rollout restart deployment/guild -n guild
+```
+
+Live-fire test:
+- Post a clear new-work request → expect a GitHub issue (with `bot-ready` label)
+  + a threaded confirmation reply in Slack + the originating message visible as
+  the first Event on `/threads/<new_thread_id>`.
+- Post a reference → expect an `Open in Slack` reply + the message appearing on
+  the referenced thread's timeline.
+- Post noise → no Slack reply, no GitHub issue, but classification recorded.
+
+### Inbox troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| `/admin/slack-inbox` empty after posting | Channel not in `/admin/slack-channels` or `enabled: false`. Check Slice 1 gate. |
+| OpenRouter card shows ⚠ unconfigured | `OPENROUTER_API_KEY` not in the Secret or rollout pending. |
+| Guild classifies its own messages (self-loop) | `SLACK_BOT_USER_ID` not set or wrong. Check Inbox Step A. |
+| `:new_work` verdict but no GitHub issue filed | Confidence below threshold, OR channel has no `default_repo`. Check the row's `action_taken` and `reasoning`. |
+| Same user spammed channel but only one classification | Working as designed — 1 classification per (user, channel) per 60s. |
