@@ -84,6 +84,12 @@ defmodule GuildWeb.AdminControllerTest do
       assert body =~ "Slack"
       assert body =~ "Linear"
       assert body =~ "Fountain"
+      assert body =~ "OpenRouter"
+    end
+
+    test "renders OpenRouter card", %{conn: conn} do
+      conn = conn |> with_auth() |> get(~p"/admin/integrations")
+      assert html_response(conn, 200) =~ "OpenRouter"
     end
 
     test "GitHub card shows ready when all env vars set", %{conn: conn} do

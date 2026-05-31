@@ -43,6 +43,12 @@ config :guild,
   guild_implementer_agent_id:
     System.get_env("GUILD_IMPLEMENTER_AGENT_ID", "5442009b-5b31-4b2d-9868-fb6d1267b6c1")
 
+# OpenRouter — stateless LLM classification (ADR 0017)
+config :guild,
+  openrouter_api_key: System.get_env("OPENROUTER_API_KEY"),
+  openrouter_classifier_model: System.get_env("OPENROUTER_CLASSIFIER_MODEL", "openai/gpt-4o-mini"),
+  slack_bot_user_id: System.get_env("SLACK_BOT_USER_ID")
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

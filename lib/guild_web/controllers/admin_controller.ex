@@ -145,12 +145,14 @@ defmodule GuildWeb.AdminController do
     slack = slack_status()
     linear = linear_status()
     fountain = fountain_status()
+    openrouter = openrouter_status()
 
     render(conn, :integrations,
       github: github,
       slack: slack,
       linear: linear,
-      fountain: fountain
+      fountain: fountain,
+      openrouter: openrouter
     )
   end
 
@@ -262,6 +264,14 @@ defmodule GuildWeb.AdminController do
        base_url_set: present?(base_url),
        agent_id_set: present?(agent_id)
      }}
+  end
+
+  defp openrouter_status do
+    api_key = Application.get_env(:guild, :openrouter_api_key)
+    model = Application.get_env(:guild, :openrouter_classifier_model, "openai/gpt-4o-mini")
+    status = if present?(api_key), do: :ready, else: :unconfigured
+
+    {status, %{api_key_set: present?(api_key), model: model}}
   end
 
   defp present?(nil), do: false

@@ -86,5 +86,18 @@
       </ul>
     </div>
 
+    <%!-- OpenRouter card --%>
+    <% {openrouter_status, openrouter_details} = @openrouter %>
+    <div class={"integration-card integration-card--#{openrouter_status}"}>
+      <h2>OpenRouter</h2>
+      <p class="integration-status">
+        Status: <strong><%= status_label(openrouter_status) %></strong>
+      </p>
+      <ul class="integration-details">
+        <li>API Key: <%= if openrouter_details.api_key_set, do: "set", else: "not set" %></li>
+        <li>Classifier Model: <%= openrouter_details.model %></li>
+      </ul>
+    </div>
+
   </div>
 </div>
