@@ -140,6 +140,66 @@ defmodule GuildWeb.AdminController do
     redirect(conn, to: ~p"/admin/slack-channels")
   end
 
+  def slack_inbox(conn, _params) do
+    events =
+      Guild.Repo.all(
+        from e in Guild.Schema.SlackInboxEvent,
+          order_by: [desc: e.inserted_at],
+          limit: 50
+      )
+
+    render(conn, :slack_inbox, events: events)
+  end
+
+  def reclassify_inbox_event(conn, %{"id" => id, "verdict" => verdict}) do
+    event = Guild.Repo.get!(Guild.Schema.SlackInboxEvent, id)
+    channel = Guild.Repo.get(Guild.Schema.SlackChannel, event.channel_id)
+
+    case verdict do
+      "new_work" ->
+        # Run :new_work action immediately (override ignores dry-run flag)
+        if channel && channel.default_repo && event.message_text do
+          title =
+            event.message_text
+            |> String.split("\n")
+            |> List.first("")
+            |> String.slice(0, 80)
+
+          date_str = Date.utc_today() |> Date.to_iso8601()
+          body =
+            event.message_text <>
+            "\n\n> @#{event.user_display_name || event.user_id} in <##{event.channel_id}> on #{date_str} (operator override)"
+
+          case Guild.GitHub.impl().create_issue(channel.default_repo, title, body, ["bot-ready"], [], nil) do
+            {:ok, %{"html_url" => issue_url}} ->
+              event
+              |> Guild.Schema.SlackInboxEvent.changeset(%{
+                override_verdict: "new_work",
+                action_taken: "issue_created",
+                github_issue_url: issue_url
+              })
+              |> Guild.Repo.update!()
+
+            {:error, _tier, reason} ->
+              require Logger
+              Logger.warning("AdminController.reclassify_inbox_event: GitHub error: #{inspect(reason)}")
+          end
+        end
+
+        redirect(conn, to: ~p"/admin/slack-inbox")
+
+      "noise" ->
+        event
+        |> Guild.Schema.SlackInboxEvent.changeset(%{override_verdict: "noise"})
+        |> Guild.Repo.update!()
+
+        redirect(conn, to: ~p"/admin/slack-inbox")
+
+      _ ->
+        redirect(conn, to: ~p"/admin/slack-inbox")
+    end
+  end
+
   def integrations(conn, _params) do
     github = github_status()
     slack = slack_status()
