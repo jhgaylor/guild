@@ -85,6 +85,15 @@ defmodule Guild.Release do
     :ok
   end
 
+  @doc """
+  Sanity-check: post a test message to the configured Slack channel.
+
+  Must be invoked via `rpc`, not `eval` — `eval` starts a new BEAM node that
+  loads code but doesn't start the supervision tree, so the HTTP client's
+  ETS pools are not present.
+
+      kubectl exec deploy/guild -n guild -- /app/bin/guild rpc 'Guild.Release.slack_ping()'
+  """
   def slack_ping do
     load_app()
     message = "Slack ping from Guild — if you see this, the bot is live."

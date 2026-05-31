@@ -7,6 +7,12 @@ reactions. Complete all eight steps in order.
 **One App per Guild instance.** Do not share a Slack App across multiple Guild
 forks — each instance needs its own App for clean credential isolation.
 
+**Ordering matters.** Slack's Event Subscriptions URL verification calls Guild's
+`/slack/events` endpoint the moment you save the Request URL, and the endpoint
+rejects any request whose signature it can't verify. So Guild needs the
+`SLACK_SIGNING_SECRET` live in its environment **before** you wire the Event
+Subscriptions URL. The steps below provision secrets first, then turn on events.
+
 ---
 
 ## Step 1 — Create a Slack App
@@ -29,46 +35,15 @@ and add the following scopes:
 
 ---
 
-## Step 3 — Configure Event Subscriptions
+## Step 3 — Install the App to Your Workspace
 
-In the left sidebar, go to **Event Subscriptions**. Toggle **Enable Events** on.
-
-Set the **Request URL** to your Guild deployment's events endpoint:
-
-```
-https://<your-deploy-host>/slack/events
-```
-
-For example: `https://guild.inevitable.fyi/slack/events`
-
-Slack will immediately challenge the URL. Guild handles `url_verification` correctly
-(wired in G6 Slice 3), so the challenge passes on the first save.
-
-Under **Subscribe to Bot Events**, add:
-
-| Event | Why |
-|---|---|
-| `message.channels` | Capture replies in public channels the bot is in |
-| `reaction_added` | Route stop_sign reactions to Guild.Control.hold |
-
-Click **Save Changes**.
+Still on **OAuth & Permissions**, click **Install to Workspace**. Authorize the
+requested permissions. After installation, copy the **Bot OAuth Token** — it
+starts with `xoxb-`. Keep it handy for Step 5.
 
 ---
 
-## Step 4 — Install the App to Your Workspace
-
-In the left sidebar, go to **OAuth & Permissions**. Click **Install to Workspace**.
-Authorize the requested permissions.
-
-After installation, copy two values from the OAuth & Permissions page and from
-**Basic Information**:
-
-- **Bot OAuth Token** — starts with `xoxb-` (from OAuth & Permissions → OAuth Tokens)
-- **Signing Secret** — 32 lowercase hex characters (from Basic Information → App Credentials)
-
----
-
-## Step 5 — Invite the Bot to the Target Channel
+## Step 4 — Invite the Bot to the Target Channel + Get Channel ID
 
 In Slack, open the channel you want Guild to post to (e.g. `#guild`). Type:
 
@@ -85,9 +60,16 @@ Next, find the **Channel ID** (not the display name — Guild uses the ID):
 3. Scroll to the bottom of the details panel.
 4. Copy the **Member ID** — it starts with `C` (e.g. `C08ABCDEF12`).
 
+Then grab the **Signing Secret**: in your Slack App's left sidebar, go to
+**Basic Information → App Credentials** and copy the **Signing Secret** (32
+lowercase hex characters).
+
+You now have all three values: `xoxb-...` (Bot Token), `C...` (Channel ID),
+and the signing secret.
+
 ---
 
-## Step 6 — Provision Secrets in the Live Cluster
+## Step 5 — Provision Secrets in the Live Cluster
 
 Add the three Slack keys to the cluster Secret. The `kubectl patch` approach is
 idempotent — safe to run against an existing secret:
@@ -108,7 +90,7 @@ kubectl patch secret guild-app-secrets -n guild \
 
 ---
 
-## Step 7 — Roll the Deployment
+## Step 6 — Roll the Deployment
 
 Restart the Guild pod so it picks up the new env vars:
 
@@ -117,7 +99,36 @@ kubectl rollout restart deployment/guild -n guild
 kubectl rollout status deployment/guild -n guild
 ```
 
-Wait for the rollout to complete before proceeding.
+Wait for the rollout to complete before proceeding to Step 7.
+
+---
+
+## Step 7 — Configure Event Subscriptions
+
+In your Slack App, go to **Event Subscriptions** and toggle **Enable Events** on.
+
+Set the **Request URL** to your Guild deployment's events endpoint:
+
+```
+https://<your-deploy-host>/slack/events
+```
+
+For example: `https://guild.inevitable.fyi/slack/events`
+
+Slack will immediately challenge the URL. Because Step 6 made `SLACK_SIGNING_SECRET`
+live in Guild's environment, the challenge passes on the first save. If you see
+"Your URL didn't respond with the value of the `challenge` parameter", confirm
+the rollout completed and that the signing secret value matches Slack's Basic
+Information → App Credentials page exactly.
+
+Under **Subscribe to Bot Events**, add:
+
+| Event | Why |
+|---|---|
+| `message.channels` | Capture replies in public channels the bot is in |
+| `reaction_added` | Route stop_sign reactions to Guild.Control.hold |
+
+Click **Save Changes**.
 
 ---
 
@@ -126,11 +137,16 @@ Wait for the rollout to complete before proceeding.
 Run the built-in ping to confirm Guild can post to the channel:
 
 ```bash
-kubectl exec deploy/guild -n guild -- /app/bin/guild eval 'Guild.Release.slack_ping()'
+kubectl exec deploy/guild -n guild -- /app/bin/guild rpc 'Guild.Release.slack_ping()'
 ```
 
-Expected output: `Slack ping succeeded.` A message **"Slack ping from Guild — if you
-see this, the bot is live."** should appear in the configured channel.
+`rpc` runs the function inside the already-running BEAM node where Guild's
+supervision tree (including the HTTP client's ETS pools) is up. `eval` starts
+a fresh node that loads code but doesn't start supervisors — it will fail with
+an ETS table error.
+
+Expected output: `Slack ping succeeded.` A message **"Slack ping from Guild — if
+you see this, the bot is live."** should appear in the configured channel.
 
 Then visit `/admin/integrations` in the Guild UI — the Slack card should show **✓ ready**.
 
@@ -138,10 +154,16 @@ Then visit `/admin/integrations` in the Guild UI — the Slack card should show 
 
 ## Troubleshooting
 
-### "URL not verified" in Slack App Event Subscriptions
+### "Your URL didn't respond with the value of the `challenge` parameter" in Slack Event Subscriptions
 
-Confirm your deploy host is publicly reachable. A POST to the events endpoint without
-a valid signing secret should return `403`, not `404` or a connection timeout:
+Almost always means `SLACK_SIGNING_SECRET` isn't live in Guild's environment yet
+(or doesn't match what Slack signs with). Check:
+
+1. `kubectl get secret guild-app-secrets -n guild -o jsonpath='{.data.SLACK_SIGNING_SECRET}' | base64 -d` matches the value on Slack's **Basic Information → App Credentials** page.
+2. The pod has been rolled since the secret was patched (`kubectl rollout status deployment/guild -n guild`).
+
+A POST to the events endpoint without a valid signature should return `403`, not
+`404` or a connection timeout:
 
 ```bash
 curl -v -X POST https://<your-deploy-host>/slack/events
@@ -150,10 +172,20 @@ curl -v -X POST https://<your-deploy-host>/slack/events
 # If you get connection refused: the host is unreachable from Slack's servers
 ```
 
+### `slack_ping` fails with `ArgumentError: the table identifier does not refer to an existing ETS table`
+
+You used `eval` instead of `rpc`. `eval` starts a new BEAM node that loads code
+but doesn't start the supervision tree, so the HTTP client's named ETS pools
+don't exist. Switch to `rpc`:
+
+```bash
+kubectl exec deploy/guild -n guild -- /app/bin/guild rpc 'Guild.Release.slack_ping()'
+```
+
 ### `slack_ping` returns `:ok` but no message appears in Slack
 
 The most common cause: the bot is not a member of the channel identified by
-`SLACK_CHANNEL_ID`. Confirm the bot was invited (Step 5) and that `SLACK_CHANNEL_ID`
+`SLACK_CHANNEL_ID`. Confirm the bot was invited (Step 4) and that `SLACK_CHANNEL_ID`
 is the **Channel ID** (starts with `C`), not the display name.
 
 ### `slack_ping` returns an error tuple
