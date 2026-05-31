@@ -124,6 +124,8 @@ kubectl create secret generic guild-app-secrets -n guild \
 | `SLACK_BOT_TOKEN` | Slack notifications and interactive controls |
 | `SLACK_CHANNEL_ID` | Target Slack channel for Guild messages |
 | `SLACK_SIGNING_SECRET` | Required for `/guild` slash commands and interactive buttons |
+For Slack integration setup (App creation, bot scopes, Event Subscriptions wiring), see [docs/slack-setup.md](slack-setup.md).
+
 | `LINEAR_API_KEY` | Linear issue state transitions |
 | `LINEAR_TEAM_ID` | Linear team to update |
 | `LINEAR_STATE_IN_PROGRESS_ID` | UUID for the "In Progress" workflow state |

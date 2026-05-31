@@ -85,6 +85,25 @@ defmodule Guild.Release do
     :ok
   end
 
+  def slack_ping do
+    load_app()
+    message = "Slack ping from Guild — if you see this, the bot is live."
+
+    case Guild.Adapters.Slack.post_message(nil, message, []) do
+      {:ok, :not_configured} ->
+        IO.puts("Slack not configured — SLACK_BOT_TOKEN or SLACK_CHANNEL_ID is missing.")
+        :error
+
+      {:ok, _} ->
+        IO.puts("Slack ping succeeded.")
+        :ok
+
+      {:error, _tier, reason} ->
+        IO.puts("Slack ping failed: #{inspect(reason)}")
+        :error
+    end
+  end
+
   def rollback(repo, version) do
     load_app()
     {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :down, to: version))
