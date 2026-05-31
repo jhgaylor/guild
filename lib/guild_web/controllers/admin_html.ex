@@ -21,6 +21,7 @@ defmodule GuildWeb.AdminHTML do
   def verdict_badge_class("new_work"), do: "badge--blue"
   def verdict_badge_class("refers_to_existing"), do: "badge--purple"
   def verdict_badge_class("noise"), do: "badge--gray"
+  def verdict_badge_class("skipped_rate_limit"), do: "badge--yellow"
   def verdict_badge_class("failed"), do: "badge--red"
   def verdict_badge_class(_), do: "badge--gray"
 
@@ -28,6 +29,7 @@ defmodule GuildWeb.AdminHTML do
   def action_badge_class("reference_reply_posted"), do: "badge--blue"
   def action_badge_class("dry_run"), do: "badge--yellow"
   def action_badge_class("noise"), do: "badge--gray"
+  def action_badge_class("skipped"), do: "badge--gray"
   def action_badge_class("failed"), do: "badge--red"
   def action_badge_class(_), do: "badge--gray"
 end

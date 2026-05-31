@@ -44,22 +44,61 @@ defmodule Guild.Workers.SlackInboxWorker do
   end
 
   defp run_classification(event_id, channel_id, user_id, user_display_name, message_ts, message_text) do
-    sixty_seconds_ago = DateTime.add(DateTime.utc_now(), -60, :second)
+    window_seconds = rate_limit_window_seconds()
 
     rate_limited? =
-      Repo.exists?(
-        from e in Schema.SlackInboxEvent,
-          where:
-            e.channel_id == ^channel_id and
-            e.user_id == ^user_id and
-            e.inserted_at > ^sixty_seconds_ago
-      )
+      window_seconds > 0 and
+        Repo.exists?(
+          from e in Schema.SlackInboxEvent,
+            where:
+              e.channel_id == ^channel_id and
+              e.user_id == ^user_id and
+              e.inserted_at > ^DateTime.add(DateTime.utc_now(), -window_seconds, :second)
+        )
 
     if rate_limited? do
-      Logger.debug("SlackInboxWorker: rate limit hit for user #{user_id} in #{channel_id}")
-      :ok
+      Logger.debug("SlackInboxWorker: rate limit hit for user #{user_id} in #{channel_id} (window #{window_seconds}s)")
+      record_skip(event_id, channel_id, user_id, user_display_name, message_ts, message_text, window_seconds)
     else
       do_classify(event_id, channel_id, user_id, user_display_name, message_ts, message_text)
+    end
+  end
+
+  defp rate_limit_window_seconds do
+    case System.get_env("SLACK_INBOX_RATE_LIMIT_SECONDS") do
+      nil -> 5
+      "" -> 5
+      raw ->
+        case Integer.parse(raw) do
+          {n, _} when n >= 0 -> n
+          _ -> 5
+        end
+    end
+  end
+
+  defp record_skip(event_id, channel_id, user_id, user_display_name, message_ts, message_text, window_seconds) do
+    attrs = %{
+      event_id: event_id,
+      channel_id: channel_id,
+      user_id: user_id,
+      user_display_name: user_display_name,
+      message_ts: message_ts,
+      message_text: String.slice(message_text || "", 0, 2000),
+      verdict: "skipped_rate_limit",
+      confidence: 0.0,
+      reasoning: "Skipped: another classification from this user in #{channel_id} within #{window_seconds}s window",
+      thread_id: nil,
+      action_taken: "skipped",
+      github_issue_url: nil
+    }
+
+    changeset = Schema.SlackInboxEvent.changeset(%Schema.SlackInboxEvent{}, attrs)
+
+    case Repo.insert(changeset, on_conflict: :nothing, conflict_target: :event_id) do
+      {:ok, _} -> :ok
+      {:error, cs} ->
+        Logger.warning("SlackInboxWorker: failed to insert skip row: #{inspect(cs.errors)}")
+        :ok
     end
   end
 

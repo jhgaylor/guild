@@ -253,6 +253,13 @@ kubectl patch secret guild-app-secrets -n guild \
 Get an OpenRouter API key at [openrouter.ai/keys](https://openrouter.ai/keys).
 Expected cost: <$1/month at single-team usage on `gpt-4o-mini` (ADR 0017).
 
+**Optional sixth key — `SLACK_INBOX_RATE_LIMIT_SECONDS`.** Suppresses repeat
+classifications from the same `(user, channel)` within this many seconds.
+Default `5` (low enough for batch test posts; high enough to catch real bursts).
+Set to `0` to disable entirely while solo-testing. Rate-limited messages still
+appear on `/admin/slack-inbox` as `skipped_rate_limit` rows so you can see what
+was dropped.
+
 ### Inbox Step C — Roll the Deployment
 
 ```bash

@@ -86,19 +86,48 @@ defmodule Guild.Workers.SlackInboxWorkerTest do
   end
 
   describe "perform/1 — rate limit" do
-    test "skips second message from same user in 60s", %{bypass: bypass} do
+    test "rate-limited second message records a skipped_rate_limit row (not silent)",
+         %{bypass: bypass} do
       System.put_env("SLACK_INBOX_DRY_RUN", "true")
+      System.put_env("SLACK_INBOX_RATE_LIMIT_SECONDS", "60")
       mock_openrouter(bypass, "noise")
 
       args1 = job_args(%{"event_id" => "evt_rl_1"})
       assert :ok = perform_job(Guild.Workers.SlackInboxWorker, args1)
-      assert Repo.get_by(Schema.SlackInboxEvent, event_id: "evt_rl_1") != nil
+      row1 = Repo.get_by(Schema.SlackInboxEvent, event_id: "evt_rl_1")
+      assert row1 != nil
+      assert row1.verdict == "noise"
 
       args2 = job_args(%{"event_id" => "evt_rl_2"})
       assert :ok = perform_job(Guild.Workers.SlackInboxWorker, args2)
-      assert nil == Repo.one(from e in Schema.SlackInboxEvent, where: e.event_id == "evt_rl_2")
+      row2 = Repo.get_by(Schema.SlackInboxEvent, event_id: "evt_rl_2")
+      assert row2 != nil
+      assert row2.verdict == "skipped_rate_limit"
+      assert row2.action_taken == "skipped"
+      assert row2.reasoning =~ "60s window"
     after
       System.delete_env("SLACK_INBOX_DRY_RUN")
+      System.delete_env("SLACK_INBOX_RATE_LIMIT_SECONDS")
+    end
+
+    test "SLACK_INBOX_RATE_LIMIT_SECONDS=0 disables the limit entirely",
+         %{bypass: bypass} do
+      System.put_env("SLACK_INBOX_DRY_RUN", "true")
+      System.put_env("SLACK_INBOX_RATE_LIMIT_SECONDS", "0")
+      Bypass.expect(bypass, "POST", "/v1/chat/completions", fn conn ->
+        json = Jason.encode!(%{verdict: "noise", confidence: 0.9, reasoning: "x", matched_thread_id: nil})
+        Plug.Conn.resp(conn, 200, Jason.encode!(%{choices: [%{message: %{content: json}}]}))
+      end)
+
+      args1 = job_args(%{"event_id" => "evt_nolim_1"})
+      args2 = job_args(%{"event_id" => "evt_nolim_2"})
+      assert :ok = perform_job(Guild.Workers.SlackInboxWorker, args1)
+      assert :ok = perform_job(Guild.Workers.SlackInboxWorker, args2)
+      assert Repo.get_by(Schema.SlackInboxEvent, event_id: "evt_nolim_1").verdict == "noise"
+      assert Repo.get_by(Schema.SlackInboxEvent, event_id: "evt_nolim_2").verdict == "noise"
+    after
+      System.delete_env("SLACK_INBOX_DRY_RUN")
+      System.delete_env("SLACK_INBOX_RATE_LIMIT_SECONDS")
     end
   end
 
