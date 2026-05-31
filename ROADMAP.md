@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-_(empty — G9 closed 2026-05-30; G10 thesis pending)_
+- **g10-framing review** — framing doc at [`plan/g10-framing/framing.md`](plan/g10-framing/framing.md) awaiting driver approval; once approved, dispatch captain-picard to decompose into a slice plan.
 
 ## Done
 
@@ -67,7 +67,7 @@ _(empty — G9 closed 2026-05-30; G10 thesis pending)_
 
 ## Next
 
-- **G10 — thesis selection pending.** Carry-overs from G9 close that should inform framing: reply-thread driven controls (G9 stretch item 7); `Guild.Digest` queue separation; multi-WORKER prove-out (only `default` worker exercised live to date); live Linear webhook setup (operator pending since G6); Slack Block Kit per-state UX iteration; worker/repo edit/delete in `/admin`; controller error feedback for hold/resume/abandon; first-run setup wizard. Driver picks G10 thesis before captain-picard kicks off the next slice plan.
+- **G10 — Guild listens in Slack and acts like a colleague.** Framed in [`plan/g10-framing/framing.md`](plan/g10-framing/framing.md): top-level Slack messages get classified by an LLM (`:new_work` / `:refers_to_existing` / `:noise`) and Guild engages accordingly — opens a `bot-ready` issue on the channel's default repo, OR pulls the conversation back to the existing work thread, OR stays silent. Implicit listening (read every top-level message in enabled channels), GitHub issue as new-work artifact, Fountain-conv-per-classification. Includes `slack_channels` config table, `/admin/slack-inbox` operator review surface, and a `SLACK_INBOX_DRY_RUN` flag for safe rollout. Closes on driver dry-run with the live workspace. **Deferred to G11+:** reactions-as-override (G10 stretch item 10); reply-thread driven controls (G9 stretch); `Guild.Digest` queue separation; multi-WORKER prove-out; live Linear setup; worker/repo edit/delete; first-run setup wizard.
 
 ## Gated
 
