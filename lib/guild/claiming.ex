@@ -7,7 +7,7 @@ defmodule Guild.Claiming do
   require Logger
 
   alias Guild.Repo
-  alias Guild.Schema.{Thread, Event, Artifact}
+  alias Guild.Schema.{Thread, Event, Artifact, SlackInboxEvent}
   alias Guild.Primitives.Meta
   alias Guild.Adapters.Fountain
   import Ecto.Query, only: [from: 2]
@@ -30,6 +30,10 @@ defmodule Guild.Claiming do
          {:ok, _event} <- insert_seed_event(repo, issue_number, thread),
          {:ok, conv_id} <- dispatch_and_store(thread, repo, issue_number, worker_id),
          {:ok, thread} <- transition_to_executing(thread) do
+      # Bridge: if this issue was originally filed from Slack, link the thread and
+      # backfill slack_inbox_events so the Slack message appears on /threads/:id.
+      bridge_slack_inbox_event(repo, issue_number, thread)
+
       issue_title = Map.get(issue, "title", "GitHub Issue ##{issue_number} on #{repo}")
 
       thread =
@@ -236,6 +240,56 @@ defmodule Guild.Claiming do
       :ok
     else
       Guild.Adapters.Linear.update_issue(linear_issue_id, %{stateId: state_id})
+    end
+  end
+
+  # Bridge: look up a slack_inbox_events row for this GitHub issue URL,
+  # backfill thread_id, and insert a slack.message Event on the new thread
+  # so the originating Slack message appears in /threads/:id timeline.
+  defp bridge_slack_inbox_event(repo, issue_number, thread) do
+    github_issue_url = "https://github.com/#{repo}/issues/#{issue_number}"
+
+    case Repo.one(
+      from e in SlackInboxEvent,
+        where: e.github_issue_url == ^github_issue_url and is_nil(e.thread_id),
+        limit: 1
+    ) do
+      nil ->
+        # Not filed from Slack — nothing to bridge
+        :ok
+
+      inbox_event ->
+        # 1. Backfill thread_id on slack_inbox_events
+        inbox_event
+        |> Ecto.Changeset.change(thread_id: thread.id)
+        |> Repo.update()
+
+        # 2. Insert Event row so Slack message appears in thread timeline
+        event_attrs = %{
+          source: "slack",
+          event_type: "slack.message",
+          occurred_at: inbox_event.inserted_at,
+          raw_payload: %{
+            channel_id: inbox_event.channel_id,
+            user_id: inbox_event.user_id,
+            user_display_name: inbox_event.user_display_name,
+            message_ts: inbox_event.message_ts,
+            message_text: inbox_event.message_text
+          },
+          thread_id: thread.id,
+          idempotency_key: "slack:bridge:#{inbox_event.event_id}"
+        }
+
+        changeset = Event.changeset(%Event{}, event_attrs)
+
+        case Repo.insert(changeset, on_conflict: :nothing, conflict_target: :idempotency_key) do
+          {:ok, _} ->
+            Logger.info("Claiming: bridged Slack inbox event #{inbox_event.event_id} to thread #{thread.id}")
+            :ok
+          {:error, cs} ->
+            Logger.warning("Claiming: failed to insert bridge Event: #{inspect(cs.errors)}")
+            :ok  # non-fatal — claiming succeeds regardless
+        end
     end
   end
 end
