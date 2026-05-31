@@ -178,6 +178,54 @@ defmodule Guild.ClaimingTest do
     end
   end
 
+  describe "bridge_slack_inbox_event via claim_issue" do
+    test "slack_inbox_events row gets thread_id backfilled and Event inserted", %{bypass: bypass} do
+      # Set up a slack_inbox_events row as if SlackInboxWorker created it for a :new_work action
+      issue_url = "https://github.com/owner/repo/issues/77"
+      {:ok, inbox_event} = Repo.insert(
+        Guild.Schema.SlackInboxEvent.changeset(%Guild.Schema.SlackInboxEvent{}, %{
+          event_id: "evt_bridge_test",
+          channel_id: "C_BRIDGE",
+          user_id: "U_BRIDGE",
+          message_ts: "1234567890.000099",
+          message_text: "can you add dark mode?",
+          verdict: "new_work",
+          confidence: 0.92,
+          reasoning: "direct task request",
+          action_taken: "issue_created",
+          github_issue_url: issue_url,
+          thread_id: nil
+        })
+      )
+      assert inbox_event.thread_id == nil
+
+      # GitHub TestAdapter defaults to {:ok, %{}} for get_issue — sufficient for the with-chain
+      # Fountain mock: return a conv_id
+      Bypass.expect_once(bypass, "POST", "/api/conversations", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(201, Jason.encode!(%{data: %{id: "conv-bridge-77"}}))
+      end)
+
+      assert {:ok, %{thread: thread}} = Guild.Claiming.claim_issue("owner/repo", 77)
+
+      # After claiming: slack_inbox_events.thread_id is backfilled
+      updated_inbox = Repo.get_by!(Guild.Schema.SlackInboxEvent, event_id: "evt_bridge_test")
+      assert updated_inbox.thread_id == thread.id
+
+      # Event row inserted on the new thread with event_type: "slack.message"
+      bridge_event = Repo.one(
+        from e in Guild.Schema.Event,
+          where:
+            e.thread_id == ^thread.id and
+            e.event_type == "slack.message" and
+            e.source == "slack"
+      )
+      assert bridge_event != nil
+      assert get_in(bridge_event.raw_payload, ["channel_id"]) == "C_BRIDGE"
+    end
+  end
+
   # Helper: runs a full claim_issue as the ClaimWorker would
   defp perform_claim(repo, issue_number, worker_id) do
     Guild.Claiming.claim_issue(repo, issue_number, worker_id)

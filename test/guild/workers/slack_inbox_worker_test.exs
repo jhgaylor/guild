@@ -110,4 +110,134 @@ defmodule Guild.Workers.SlackInboxWorkerTest do
       assert nil == Repo.one(from e in Schema.SlackInboxEvent, where: e.event_id == "evt_nokey")
     end
   end
+
+  describe "perform/1 — :new_work live action" do
+    test "creates GitHub issue, posts Slack reply, inserts action_taken: issue_created", %{bypass: bypass} do
+      System.put_env("SLACK_INBOX_DRY_RUN", "false")
+
+      # Configure GitHub test adapter to return a successful create_issue response
+      Guild.GitHub.TestAdapter.configure(:create_issue, {:ok, %{"html_url" => "https://github.com/owner/repo/issues/99", "number" => 99}})
+
+      # Configure Slack
+      Application.put_env(:guild, :slack_bot_token, "xoxb-test")
+      Application.put_env(:guild, :slack_channel_id, "C_TEST_DEFAULT")
+      Application.put_env(:guild, :slack_api_url, "http://localhost:#{bypass.port}/api/chat.postMessage")
+
+      mock_openrouter(bypass, "new_work", 0.95)
+
+      # Slack mock: expect a chat.postMessage call
+      Bypass.expect_once(bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        assert decoded["thread_ts"] == "1234567890.000001"
+        assert decoded["channel"] == "C_TEST"
+        assert String.contains?(decoded["text"], "Filed as")
+        Plug.Conn.resp(conn, 200, ~s({"ok":true,"channel":"C_TEST","ts":"111.222"}))
+      end)
+
+      args = job_args()
+      assert :ok = perform_job(Guild.Workers.SlackInboxWorker, args)
+
+      event = Repo.one(from e in Schema.SlackInboxEvent, where: e.event_id == ^args["event_id"])
+      assert event.action_taken == "issue_created"
+      assert event.github_issue_url == "https://github.com/owner/repo/issues/99"
+    after
+      System.delete_env("SLACK_INBOX_DRY_RUN")
+      Application.delete_env(:guild, :slack_bot_token)
+      Application.delete_env(:guild, :slack_channel_id)
+      Application.delete_env(:guild, :slack_api_url)
+    end
+  end
+
+  describe "perform/1 — :refers_to_existing live action" do
+    test "inserts Event on matched thread, posts Slack reply, action_taken: reference_reply_posted", %{bypass: bypass} do
+      System.put_env("SLACK_INBOX_DRY_RUN", "false")
+
+      # Configure Slack
+      Application.put_env(:guild, :slack_bot_token, "xoxb-test")
+      Application.put_env(:guild, :slack_channel_id, "C_TEST_DEFAULT")
+      Application.put_env(:guild, :slack_api_url, "http://localhost:#{bypass.port}/api/chat.postMessage")
+
+      # Insert a real thread to match against
+      {:ok, thread} = Repo.insert(
+        Schema.Thread.changeset(%Schema.Thread{}, %{
+          anchor_type: "github_issue",
+          anchor_id: "42",
+          state: "executing",
+          slack_thread_ts: "999.000",
+          slack_channel: "C_WORK"
+        })
+      )
+
+      # OpenRouter returns :refers_to_existing with matched thread UUID
+      Bypass.expect_once(bypass, "POST", "/v1/chat/completions", fn conn ->
+        json = Jason.encode!(%{
+          verdict: "refers_to_existing",
+          confidence: 0.90,
+          reasoning: "references existing work",
+          matched_thread_id: thread.id
+        })
+        Plug.Conn.resp(conn, 200, Jason.encode!(%{choices: [%{message: %{content: json}}]}))
+      end)
+
+      # Slack mock: expect reply
+      Bypass.expect_once(bypass, "POST", "/api/chat.postMessage", fn conn ->
+        {:ok, body, conn} = Plug.Conn.read_body(conn)
+        decoded = Jason.decode!(body)
+        assert decoded["thread_ts"] == "1234567890.000001"
+        assert String.contains?(decoded["text"], "Open in Slack")
+        Plug.Conn.resp(conn, 200, ~s({"ok":true,"channel":"C_TEST","ts":"111.222"}))
+      end)
+
+      args = job_args(%{"event_id" => "evt_refers"})
+      assert :ok = perform_job(Guild.Workers.SlackInboxWorker, args)
+
+      inbox = Repo.get_by(Schema.SlackInboxEvent, event_id: "evt_refers")
+      assert inbox.action_taken == "reference_reply_posted"
+      assert inbox.thread_id == thread.id
+
+      # Event row inserted on matched thread
+      ref_event = Repo.one(from e in Schema.Event,
+        where: e.thread_id == ^thread.id and e.event_type == "slack.reference")
+      assert ref_event != nil
+    after
+      System.delete_env("SLACK_INBOX_DRY_RUN")
+      Application.delete_env(:guild, :slack_bot_token)
+      Application.delete_env(:guild, :slack_channel_id)
+      Application.delete_env(:guild, :slack_api_url)
+    end
+  end
+
+  describe "perform/1 — :noise live action" do
+    test "inserts action_taken: noise, no GitHub or Slack calls", %{bypass: bypass} do
+      System.put_env("SLACK_INBOX_DRY_RUN", "false")
+      mock_openrouter(bypass, "noise", 0.95)
+      # No Bypass expectations for GitHub or Slack — if called, Bypass will error
+
+      args = job_args(%{"event_id" => "evt_noise_live"})
+      assert :ok = perform_job(Guild.Workers.SlackInboxWorker, args)
+
+      inbox = Repo.get_by(Schema.SlackInboxEvent, event_id: "evt_noise_live")
+      assert inbox.action_taken == "noise"
+    after
+      System.delete_env("SLACK_INBOX_DRY_RUN")
+    end
+  end
+
+  describe "perform/1 — confidence below threshold" do
+    test "action_taken: noise when confidence < threshold regardless of verdict", %{bypass: bypass} do
+      System.put_env("SLACK_INBOX_DRY_RUN", "false")
+      System.put_env("SLACK_INBOX_CONFIDENCE_THRESHOLD", "0.8")
+      mock_openrouter(bypass, "new_work", 0.65)  # below 0.8 threshold
+
+      args = job_args(%{"event_id" => "evt_lowconf"})
+      assert :ok = perform_job(Guild.Workers.SlackInboxWorker, args)
+
+      inbox = Repo.get_by(Schema.SlackInboxEvent, event_id: "evt_lowconf")
+      assert inbox.action_taken == "noise"
+    after
+      System.delete_env("SLACK_INBOX_DRY_RUN")
+      System.delete_env("SLACK_INBOX_CONFIDENCE_THRESHOLD")
+    end
+  end
 end
