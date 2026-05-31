@@ -133,9 +133,10 @@ defmodule Guild.Workers.SlackInboxWorker do
       })
 
     case result do
-      {:ok, %{verdict: verdict, confidence: confidence, reasoning: reasoning, thread_id: matched_thread_id}} ->
+      {:ok, %{verdict: verdict, confidence: confidence, reasoning: reasoning, thread_id: matched_thread_id} = ok} ->
         dry_run? = System.get_env("SLACK_INBOX_DRY_RUN", "true") == "true"
         threshold = System.get_env("SLACK_INBOX_CONFIDENCE_THRESHOLD", "0.7") |> Float.parse() |> elem(0)
+        usage = Map.take(ok, [:model, :prompt_tokens, :completion_tokens, :cost_usd])
 
         if dry_run? do
           # Dry-run: record classification, no side effects
@@ -153,12 +154,12 @@ defmodule Guild.Workers.SlackInboxWorker do
             action_taken: "dry_run",
             github_issue_url: nil
           }
-          insert_inbox_event(attrs)
+          insert_inbox_event(Map.merge(attrs, usage))
         else
           dispatch_action(
             verdict, confidence, threshold, matched_thread_id,
             event_id, channel_id, user_id, user_display_name,
-            message_ts, message_text, default_repo
+            message_ts, message_text, default_repo, usage
           )
         end
 
@@ -191,7 +192,7 @@ defmodule Guild.Workers.SlackInboxWorker do
   defp dispatch_action(
     verdict, confidence, threshold, matched_thread_id,
     event_id, channel_id, user_id, user_display_name,
-    message_ts, message_text, default_repo
+    message_ts, message_text, default_repo, usage
   ) do
     cond do
       # --- :new_work ---
@@ -222,7 +223,7 @@ defmodule Guild.Workers.SlackInboxWorker do
               action_taken: "issue_created",
               github_issue_url: issue_url
             }
-            insert_inbox_event(attrs)
+            insert_inbox_event(Map.merge(attrs, usage))
 
           {:error, tier, reason} ->
             Logger.warning("SlackInboxWorker: GitHub create_issue failed: #{tier} #{inspect(reason)}")
@@ -240,7 +241,7 @@ defmodule Guild.Workers.SlackInboxWorker do
               action_taken: "failed",
               github_issue_url: nil
             }
-            insert_inbox_event(attrs)
+            insert_inbox_event(Map.merge(attrs, usage))
         end
 
       # :new_work but no default_repo configured
@@ -248,7 +249,7 @@ defmodule Guild.Workers.SlackInboxWorker do
         Logger.warning("SlackInboxWorker: :new_work verdict but no default_repo for channel #{channel_id}")
         attrs = base_attrs(event_id, channel_id, user_id, user_display_name, message_ts, message_text,
                            verdict, confidence, "no default_repo configured", nil, "noise", nil)
-        insert_inbox_event(attrs)
+        insert_inbox_event(Map.merge(attrs, usage))
 
       # --- :refers_to_existing ---
       verdict == "refers_to_existing" and confidence >= threshold and not is_nil(matched_thread_id) ->
@@ -257,7 +258,7 @@ defmodule Guild.Workers.SlackInboxWorker do
             Logger.warning("SlackInboxWorker: matched_thread_id #{matched_thread_id} not found in DB")
             attrs = base_attrs(event_id, channel_id, user_id, user_display_name, message_ts, message_text,
                                verdict, confidence, "matched thread not found", nil, "noise", nil)
-            insert_inbox_event(attrs)
+            insert_inbox_event(Map.merge(attrs, usage))
 
           thread ->
             # Record Event on matched thread
@@ -296,7 +297,7 @@ defmodule Guild.Workers.SlackInboxWorker do
             attrs = base_attrs(event_id, channel_id, user_id, user_display_name, message_ts, message_text,
                                verdict, confidence, "reference action taken", matched_thread_id,
                                "reference_reply_posted", nil)
-            insert_inbox_event(attrs)
+            insert_inbox_event(Map.merge(attrs, usage))
         end
 
       # :refers_to_existing but no matched thread or confidence below threshold
@@ -306,7 +307,7 @@ defmodule Guild.Workers.SlackInboxWorker do
                            verdict, confidence,
                            if(confidence < threshold, do: "confidence below threshold (#{confidence} < #{threshold})", else: "noise"),
                            nil, "noise", nil)
-        insert_inbox_event(attrs)
+        insert_inbox_event(Map.merge(attrs, usage))
     end
   end
 

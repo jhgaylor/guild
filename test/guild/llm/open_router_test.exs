@@ -12,12 +12,35 @@ defmodule Guild.LLM.OpenRouterTest do
     {:ok, bypass: bypass}
   end
 
-  test "returns {:ok, text} on success", %{bypass: bypass} do
+  test "returns {:ok, map with text + nil usage} when response has no usage", %{bypass: bypass} do
     Bypass.expect_once(bypass, "POST", "/v1/chat/completions", fn conn ->
       body = ~s({"choices":[{"message":{"content":"hello"}}]})
       Plug.Conn.resp(conn, 200, body)
     end)
-    assert {:ok, "hello"} = Guild.LLM.OpenRouter.complete("test prompt")
+    assert {:ok, resp} = Guild.LLM.OpenRouter.complete("test prompt")
+    assert resp.text == "hello"
+    assert resp.prompt_tokens == nil
+    assert resp.completion_tokens == nil
+    assert resp.cost_usd == nil
+    # When the response omits "model" we fall back to the requested model id.
+    assert is_binary(resp.model)
+  end
+
+  test "parses usage + cost + model from response", %{bypass: bypass} do
+    Bypass.expect_once(bypass, "POST", "/v1/chat/completions", fn conn ->
+      body = Jason.encode!(%{
+        model: "google/gemini-2.5-flash",
+        choices: [%{message: %{content: "hi"}}],
+        usage: %{prompt_tokens: 88, completion_tokens: 12, total_tokens: 100, cost: 0.0000234}
+      })
+      Plug.Conn.resp(conn, 200, body)
+    end)
+    assert {:ok, resp} = Guild.LLM.OpenRouter.complete("test prompt")
+    assert resp.text == "hi"
+    assert resp.model == "google/gemini-2.5-flash"
+    assert resp.prompt_tokens == 88
+    assert resp.completion_tokens == 12
+    assert resp.cost_usd == 0.0000234
   end
 
   test "returns {:error, :no_api_key} when key absent" do

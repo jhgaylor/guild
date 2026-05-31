@@ -2,6 +2,13 @@
   <h1 class="page-title">Slack Inbox</h1>
   <p class="page-subtitle"><a href={~p"/admin"}>← Admin</a></p>
 
+  <% {sum_24h, n_24h} = @cost_24h %>
+  <% {sum_7d, n_7d} = @cost_7d %>
+  <p class="page-subtitle" style="margin-top:-6px">
+    Cost — last 24h: <strong><%= format_cost(sum_24h) %></strong> across <%= n_24h %> classification<%= if n_24h == 1, do: "", else: "s" %>
+    · last 7d: <strong><%= format_cost(sum_7d) %></strong> across <%= n_7d %>
+  </p>
+
   <%= if Enum.empty?(@events) do %>
     <p class="empty-state">No Slack inbox events yet. Enable a channel in <a href={~p"/admin/slack-channels"}>Slack Channels</a> and set <code>SLACK_INBOX_DRY_RUN=false</code> (or leave dry-run on to preview classifications here).</p>
   <% else %>
@@ -14,6 +21,7 @@
           <th>Message</th>
           <th>Verdict</th>
           <th>Confidence</th>
+          <th>Model / Cost</th>
           <th>Action</th>
           <th>Reasoning</th>
           <th>Override</th>
@@ -35,6 +43,19 @@
             </td>
             <td>
               <%= if event.confidence, do: "#{round(event.confidence * 100)}%", else: "—" %>
+            </td>
+            <td style="font-size:0.85em;white-space:nowrap">
+              <%= if event.model do %>
+                <div style="color:#888"><%= short_model(event.model) %></div>
+              <% else %>
+                <div style="color:#888">—</div>
+              <% end %>
+              <div><strong><%= format_cost(event.cost_usd) %></strong></div>
+              <%= if event.prompt_tokens || event.completion_tokens do %>
+                <div style="color:#888">
+                  <%= event.prompt_tokens || 0 %>p + <%= event.completion_tokens || 0 %>c
+                </div>
+              <% end %>
             </td>
             <td>
               <span class={"badge #{action_badge_class(event.action_taken)}"}>

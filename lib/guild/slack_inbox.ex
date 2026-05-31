@@ -11,8 +11,13 @@ defmodule Guild.SlackInbox do
     prompt = build_prompt(msg, ch_name || ch_id, default_repo, display_name, threads)
 
     case Guild.LLM.OpenRouter.complete(prompt) do
-      {:ok, text} ->
-        parse_classification(text)
+      {:ok, %{text: text} = response} ->
+        usage = Map.take(response, [:model, :prompt_tokens, :completion_tokens, :cost_usd])
+
+        case parse_classification(text) do
+          {:ok, classification} -> {:ok, Map.merge(classification, usage)}
+          other -> other
+        end
 
       {:error, :no_api_key} ->
         {:error, :no_api_key}

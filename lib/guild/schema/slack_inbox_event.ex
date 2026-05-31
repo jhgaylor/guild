@@ -18,6 +18,10 @@ defmodule Guild.Schema.SlackInboxEvent do
     field :action_taken, :string
     field :github_issue_url, :string
     field :override_verdict, :string
+    field :model, :string
+    field :prompt_tokens, :integer
+    field :completion_tokens, :integer
+    field :cost_usd, :float
 
     timestamps(type: :utc_datetime_usec)
   end
@@ -27,7 +31,8 @@ defmodule Guild.Schema.SlackInboxEvent do
     |> cast(attrs, [
       :event_id, :channel_id, :user_id, :user_display_name,
       :message_ts, :message_text, :verdict, :confidence, :reasoning,
-      :thread_id, :action_taken, :github_issue_url, :override_verdict
+      :thread_id, :action_taken, :github_issue_url, :override_verdict,
+      :model, :prompt_tokens, :completion_tokens, :cost_usd
     ])
     |> validate_required([:event_id, :channel_id, :user_id, :message_ts])
     |> unique_constraint(:event_id)

@@ -42,7 +42,11 @@ defmodule Guild.Workers.SlackInboxWorkerTest do
         reasoning: "test reasoning",
         matched_thread_id: nil
       })
-      body = Jason.encode!(%{choices: [%{message: %{content: json}}]})
+      body = Jason.encode!(%{
+        model: "openai/gpt-4o-mini",
+        choices: [%{message: %{content: json}}],
+        usage: %{prompt_tokens: 120, completion_tokens: 30, total_tokens: 150, cost: 0.000123}
+      })
       Plug.Conn.resp(conn, 200, body)
     end)
   end
@@ -59,6 +63,12 @@ defmodule Guild.Workers.SlackInboxWorkerTest do
       assert event.verdict == "new_work"
       assert event.confidence == 0.95
       assert event.action_taken == "dry_run"
+      # Usage metadata captured from the OpenRouter response and persisted on
+      # the row so /admin/slack-inbox can show per-classification cost.
+      assert event.model == "openai/gpt-4o-mini"
+      assert event.prompt_tokens == 120
+      assert event.completion_tokens == 30
+      assert event.cost_usd == 0.000123
     after
       System.delete_env("SLACK_INBOX_DRY_RUN")
     end

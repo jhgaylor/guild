@@ -11,9 +11,13 @@ defmodule Guild.LLM.OpenRouter do
   @timeout_ms 10_000
 
   @doc """
-  Send a single-turn prompt and return the model's text response.
+  Send a single-turn prompt and return the model's response plus usage metadata.
 
-  Returns {:ok, text} on success or {:error, reason} on failure.
+  Returns `{:ok, %{text:, model:, prompt_tokens:, completion_tokens:, cost_usd:}}`
+  on success or `{:error, reason}` on failure. `cost_usd`, `prompt_tokens`, and
+  `completion_tokens` may be nil if OpenRouter doesn't return usage data for the
+  selected model. `model` is the resolved model id actually used (echoed by
+  OpenRouter, may differ from the request if a fallback fired).
   """
   def complete(prompt, opts \\ []) do
     api_key = Application.get_env(:guild, :openrouter_api_key)
@@ -30,7 +34,9 @@ defmodule Guild.LLM.OpenRouter do
         model: model,
         messages: [%{role: "user", content: prompt}],
         max_tokens: 300,
-        temperature: 0.1
+        temperature: 0.1,
+        # OpenRouter: opt in to per-request cost reporting in the response usage object.
+        usage: %{include: true}
       })
 
       headers = [
@@ -42,8 +48,15 @@ defmodule Guild.LLM.OpenRouter do
       case HTTPoison.post(url, body, headers, recv_timeout: @timeout_ms, timeout: @timeout_ms) do
         {:ok, %{status_code: status, body: resp_body}} when status in 200..299 ->
           case Jason.decode(resp_body) do
-            {:ok, %{"choices" => [%{"message" => %{"content" => text}} | _]}} ->
-              {:ok, text}
+            {:ok, %{"choices" => [%{"message" => %{"content" => text}} | _]} = decoded} ->
+              usage = Map.get(decoded, "usage", %{})
+              {:ok, %{
+                text: text,
+                model: Map.get(decoded, "model") || model,
+                prompt_tokens: Map.get(usage, "prompt_tokens"),
+                completion_tokens: Map.get(usage, "completion_tokens"),
+                cost_usd: Map.get(usage, "cost") || Map.get(usage, "total_cost")
+              }}
             {:ok, other} ->
               Logger.warning("OpenRouter: unexpected response shape: #{inspect(other)}")
               {:error, {:unexpected_shape, other}}

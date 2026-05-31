@@ -150,7 +150,29 @@ defmodule GuildWeb.AdminController do
           limit: 50
       )
 
-    render(conn, :slack_inbox, events: events)
+    now = DateTime.utc_now()
+    day_ago = DateTime.add(now, -86_400, :second)
+    week_ago = DateTime.add(now, -7 * 86_400, :second)
+
+    cost_24h =
+      Guild.Repo.one(
+        from e in Guild.Schema.SlackInboxEvent,
+          where: e.inserted_at > ^day_ago and not is_nil(e.cost_usd),
+          select: {coalesce(sum(e.cost_usd), 0.0), count(e.id)}
+      )
+
+    cost_7d =
+      Guild.Repo.one(
+        from e in Guild.Schema.SlackInboxEvent,
+          where: e.inserted_at > ^week_ago and not is_nil(e.cost_usd),
+          select: {coalesce(sum(e.cost_usd), 0.0), count(e.id)}
+      )
+
+    render(conn, :slack_inbox,
+      events: events,
+      cost_24h: cost_24h,
+      cost_7d: cost_7d
+    )
   end
 
   def reclassify_inbox_event(conn, %{"id" => id, "verdict" => verdict}) do

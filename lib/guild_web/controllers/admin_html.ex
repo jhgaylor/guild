@@ -32,4 +32,24 @@ defmodule GuildWeb.AdminHTML do
   def action_badge_class("skipped"), do: "badge--gray"
   def action_badge_class("failed"), do: "badge--red"
   def action_badge_class(_), do: "badge--gray"
+
+  # Format a USD cost into a human-readable string. Sub-cent values render as
+  # tenths of a cent so per-classification cost stays visible at typical
+  # gpt-4o-mini / gemini-flash price points (~$0.0001–$0.001 each).
+  def format_cost(nil), do: "—"
+  def format_cost(c) when is_number(c) and c == 0, do: "$0"
+  def format_cost(c) when is_number(c) and c >= 0.01, do: "$#{:erlang.float_to_binary(c * 1.0, decimals: 4)}"
+  def format_cost(c) when is_number(c) and c >= 0.0001, do: "$#{:erlang.float_to_binary(c * 1.0, decimals: 6)}"
+  def format_cost(c) when is_number(c) and c > 0, do: "<$0.000001"
+  def format_cost(_), do: "—"
+
+  # Strip the provider prefix from a model id for compact display in the
+  # inbox table. "openai/gpt-4o-mini" → "gpt-4o-mini".
+  def short_model(nil), do: "—"
+  def short_model(model) when is_binary(model) do
+    case String.split(model, "/", parts: 2) do
+      [_provider, name] -> name
+      [single] -> single
+    end
+  end
 end
