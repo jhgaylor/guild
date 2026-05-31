@@ -1,7 +1,7 @@
 # ADR 0017 — OpenRouter for Stateless LLM Classification
 
-**Status:** Proposed
-**Deciders:** captain-picard (proposed), driver (to accept/reject)
+**Status:** Accepted
+**Deciders:** captain-picard (proposed), driver (accepted 2026-05-31)
 **Context:** G10 — Guild listens in Slack and acts like a colleague
 
 ---
