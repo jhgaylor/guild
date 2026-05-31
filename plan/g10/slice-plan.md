@@ -9,7 +9,7 @@ G10 closes when the driver, having dry-run a live workspace session, observes: t
 **Architectural decisions (all settled in ADR 0017):**
 - OpenRouter direct for stateless one-shot classification; Fountain reserved for stateful multi-turn agent work.
 - Default model: `openai/gpt-4o-mini` via OpenRouter; swappable via `OPENROUTER_CLASSIFIER_MODEL`.
-- Structured JSON output: `{verdict, confidence, reasoning, matched_thread_id}`.
+- Structured JSON output: `{verdict, confidence, reasoning, matched_thread_id}`. `slack_inbox_events` stores this as `thread_id` (dual-purpose: classifier match for `:refers_to_existing`; backfilled by thread-creation path for `:new_work`).
 - Confidence threshold: 0.7 global default, env-configurable.
 - Rate limit: 1 classification per (user_id, channel_id) per 60s, enforced via DB query on `slack_inbox_events`.
 - Failure modes: timeout/unreachable → 1 retry, then record-and-skip; malformed JSON → treat as `:noise`; no API key → inbox disabled.
@@ -90,7 +90,7 @@ G9 main. No other slices.
   verdict :string                      -- "new_work" | "refers_to_existing" | "noise" | "skipped" | "failed"
   confidence :float
   reasoning :text
-  matched_thread_id :binary_id, null: true  -- FK→threads.id
+  thread_id :binary_id, null: true           -- FK→threads.id; dual-purpose: classifier match for :refers_to_existing, backfilled by thread-creation path for :new_work
   action_taken :string, null: true     -- nil | "issue_created" | "reference_reply_posted" | "dry_run" | "noise"
   github_issue_url :string, null: true
   override_verdict :string, null: true
@@ -115,7 +115,7 @@ G9 main. No other slices.
   ```elixir
   def classify(%{message: msg, channel: channel, user: user, open_threads: threads})
   ```
-  Builds the classifier prompt (see prompt design below), calls `Guild.LLM.OpenRouter.complete/2`, parses JSON, returns `{:ok, %{verdict:, confidence:, reasoning:, matched_thread_id:}}` or `{:error, reason}`.
+  Builds the classifier prompt (see prompt design below), calls `Guild.LLM.OpenRouter.complete/2`, parses JSON, returns `{:ok, %{verdict:, confidence:, reasoning:, thread_id:}}` or `{:error, reason}`.
 
   **Classifier prompt design:**
   ```
@@ -140,16 +140,16 @@ G9 main. No other slices.
     "verdict": "new_work" | "refers_to_existing" | "noise",
     "confidence": <float 0.0-1.0>,
     "reasoning": "<≤200 chars explaining your verdict>",
-    "matched_thread_id": "<thread UUID if refers_to_existing, else null>"
+    "matched_thread_id": "<thread UUID if refers_to_existing, else null — stored as thread_id in slack_inbox_events>"
   }
   ```
 
 - **`Guild.Workers.SlackInboxWorker`** — `lib/guild/workers/slack_inbox_worker.ex`. Oban.Worker, queue `:slack_inbox`, `max_attempts: 2`, unique on `[event_id]`:
   - Prefilter (skip + no row): `subtype == "bot_message"` OR `user_id == bot_user_id` (read from `Application.get_env(:guild, :slack_bot_user_id)`) OR message length < 10 OR message starts with `/`.
-  - Rate limit: query `slack_inbox_events` for same `(channel_id, user_id)` in last 60s. If found, `:ok` (skip silently, no row).
+  - Rate limit (inside worker, before OpenRouter call): query `slack_inbox_events` for same `(channel_id, user_id)` in last 60s. If found, return `:ok` (skip silently, no new row). Enforced here rather than at the Events handler so the handler stays thin and rate-limit state survives pod restarts.
   - Load the 20 most-recently-updated open threads (state in `[:noticed, :claimed, :executing, :pr_open]`, ordered by `updated_at desc`, limit 20).
   - Call `Guild.SlackInbox.classify/1`.
-  - Insert `slack_inbox_events` row with verdict, confidence, reasoning, matched_thread_id.
+  - Insert `slack_inbox_events` row with verdict, confidence, reasoning, thread_id (= classifier's `matched_thread_id` for `:refers_to_existing`; null for others — backfilled later for `:new_work`).
   - If `SLACK_INBOX_DRY_RUN == "true"` (default): set `action_taken: "dry_run"`. Return `:ok`.
   - If not dry-run: pass to the action dispatch (Slice 3 adds this; stub with `action_taken: "noise"` for now).
 
@@ -159,7 +159,7 @@ G9 main. No other slices.
 
 - **Integration status** — extend `/admin/integrations` OpenRouter card: ready iff `OPENROUTER_API_KEY` present.
 
-- **`k8s/secret.yaml`** key list: add `OPENROUTER_API_KEY`, `OPENROUTER_CLASSIFIER_MODEL`, `SLACK_INBOX_DRY_RUN`, `SLACK_INBOX_CONFIDENCE_THRESHOLD`, `SLACK_BOT_USER_ID`.
+- **`k8s/secret.yaml`** key list: add `OPENROUTER_API_KEY`, `OPENROUTER_CLASSIFIER_MODEL`, `SLACK_INBOX_DRY_RUN`, `SLACK_INBOX_CONFIDENCE_THRESHOLD`, `SLACK_BOT_USER_ID`. Note: `k8s/secret.yaml` is documentation/template only — the live Secret is hand-managed via `kubectl patch` per the G8/G9 deploy runbook. Do not `kubectl apply` it.
 
 - Tests: `SlackInboxWorker` with Bypass-mocked OpenRouter → correct `slack_inbox_events` row inserted; prefilter skips bot messages; rate limit skips second message from same user in 60s; dry-run sets `action_taken: "dry_run"` and does not call any GitHub/Slack action. `Guild.LLM.OpenRouter.complete/1` test with Bypass mock. `Guild.SlackInbox.classify/1` unit test with a mock OpenRouter response.
 
@@ -208,11 +208,12 @@ Slice 1 merged. ADR 0017 accepted.
   - Insert a `slack_inbox_events` row with `action_taken: "issue_created"`, `github_issue_url` from the response.
   - Post a confirmation reply to the originating Slack message (using `post_message` with `thread_ts: message_ts` so the reply threads under the original message — NOT a new top-level post):
     `"Filed as [<repo>#<N>](<url>). I'll keep you posted in this thread."`
+  - **Bridging originating message to the work thread:** When the GitHub webhook fires and creates the work thread (or when `ClaimWorker` creates it), the thread-creation path looks up `slack_inbox_events WHERE github_issue_url = <new_issue_url>`, backfills `thread_id = new_thread.id`, then inserts an `Event` row on the new thread (`source: "slack"`, `event_type: "slack.message"`, `body: message_text`, `thread_id: new_thread.id`) so the originating Slack message appears first in the `/threads/:id` timeline. This is what makes the Slack conversation and the work thread feel contiguous to the operator.
   - If `default_repo` is nil: set `action_taken: "noise"` (cannot file without a repo; log a warning).
   - If confidence < threshold: set `action_taken: "noise"` (record-only, no issue).
 
-  **`:refers_to_existing` action** (only when confidence ≥ threshold AND `matched_thread_id` resolves to a live thread):
-  - Record the Slack message as an `Event` row on the matched thread (`source: "slack"`, `event_type: "slack.reference"`, `thread_id: matched_thread_id`).
+  **`:refers_to_existing` action** (only when confidence ≥ threshold AND `thread_id` resolves to a live thread):
+  - Record the Slack message as an `Event` row on the matched thread (`source: "slack"`, `event_type: "slack.reference"`, `thread_id: thread_id`).
   - Post a reply to the originating Slack message (threaded reply, `thread_ts: message_ts`):
     `"@<user_display_name> — this looks like ongoing work: [Open in Slack](<app_redirect_url>). Continuing there."` where `app_redirect_url` uses the matched thread's `slack_channel` + `slack_thread_ts`.
   - If the matched thread has no `slack_thread_ts` (no prior Slack post for that work thread): reply without the Slack link, just `"@<user> — this looks like ongoing work on [<repo>#<issue>](<github_url>)."`

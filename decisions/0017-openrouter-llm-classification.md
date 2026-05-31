@@ -87,9 +87,20 @@ Fields:
 - `confidence`: float 0.0–1.0. Required. The model's self-assessed certainty.
 - `reasoning`: string ≤ 500 chars. Required. Shown in `/admin/slack-inbox` for
   operator review. Must be in the prompt — LLMs omit it when not instructed.
-- `matched_thread_id`: string UUID or `null`. Required when `verdict ==
-  "refers_to_existing"`; null otherwise. The classifier selects from the
+- `matched_thread_id`: string UUID or `null`. For `refers_to_existing`: the
+  thread the classifier matched from the candidate list. For `new_work`: null at
+  classification time; populated later (see `thread_id` in `slack_inbox_events`)
+  when ClaimWorker creates the work thread. The classifier selects from the
   candidate thread list included in the prompt.
+
+The `slack_inbox_events` table stores `thread_id` (not `matched_thread_id`) and
+dual-purposes the column: for `:refers_to_existing` it is set immediately on
+classification; for `:new_work` it is null until the GitHub issue is created and
+the webhook creates a work thread — at which point the thread-creation path
+looks up the `slack_inbox_events` row by `github_issue_url` and backfills
+`thread_id`, then inserts an `Event` row (`source: "slack"`, `event_type:
+"slack.message"`) on the new thread so the originating Slack message appears in
+the thread timeline on `/threads/:id`.
 
 The classifier prompt includes `"Return only valid JSON. No markdown. No
 commentary before or after the JSON object."` The parser validates with
@@ -104,11 +115,13 @@ Per-channel thresholds deferred to G11.
 
 ### Rate limiting
 
-**1 classification per (user_id, channel_id) per 60 seconds.** Enforced at
-the Slack Events handler before enqueuing `SlackInboxWorker`. Implementation:
-query `slack_inbox_events` for a row with matching `(channel_id, user_id)`
-inserted in the last 60 seconds. If found, skip silently (no Event row, no
-job). This is simpler than ETS and survives pod restarts.
+**1 classification per (user_id, channel_id) per 60 seconds.** Enforced inside
+`SlackInboxWorker` at the start of `perform/1`, before the OpenRouter call.
+Implementation: query `slack_inbox_events` for a row with matching `(channel_id,
+user_id)` inserted in the last 60 seconds. If found, return `:ok` silently (no
+new row, no action). Enforcing inside the worker (rather than at the Events
+handler before enqueue) keeps the Events handler thin and ensures rate-limit
+state survives across pod restarts without ETS.
 
 ### Failure modes
 
@@ -119,6 +132,7 @@ job). This is simpler than ETS and survives pod restarts.
 | Malformed / non-JSON response | Treat as `:noise`, `confidence: 0.0`, record raw response in `reasoning`. |
 | `OPENROUTER_API_KEY` absent | Inbox disabled entirely; SlackInboxWorker is never enqueued. Integration status dashboard shows OpenRouter card as ⚠ unconfigured. |
 | OpenRouter returns valid JSON but wrong shape | Same as malformed — `:noise`, `confidence: 0.0`. |
+| `SLACK_BOT_USER_ID` absent | Self-loop guard degrades to subtype-only (`subtype == "bot_message"`). Belt reduced to one strap until `SLACK_BOT_USER_ID` is provisioned. Log a warning at startup when absent so the operator notices. |
 
 No cost cap in G10 v1. Expected cost at typical single-team usage (~50 qualifying
 msgs/day after prefilter) is under $1/month. Document cost expectations in
