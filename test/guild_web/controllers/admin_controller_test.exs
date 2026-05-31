@@ -231,21 +231,55 @@ defmodule GuildWeb.AdminControllerTest do
   end
 
   describe "POST /admin/slack-channels" do
+    # The form on /admin/slack-channels uses <.form for={@changeset}>, which
+    # posts schema fields nested under "slack_channel[...]". The raw
+    # "default_repo" <select> stays at the top level. Tests post the real shape.
+
     test "creates a channel and redirects", %{conn: conn} do
       conn =
         conn
         |> with_auth()
-        |> post(~p"/admin/slack-channels", %{channel_id: "C222TEST", default_repo: "", notes: ""})
+        |> post(~p"/admin/slack-channels", %{
+          "slack_channel" => %{"channel_id" => "C222TEST", "notes" => ""},
+          "default_repo" => ""
+        })
       assert redirected_to(conn) == ~p"/admin/slack-channels"
       assert Guild.Repo.get(Guild.Schema.SlackChannel, "C222TEST") != nil
     end
 
-    test "blank channel_id returns 200 with error", %{conn: conn} do
+    test "stores notes and default_repo when provided", %{conn: conn} do
+      {:ok, _} = Guild.Repo.insert(%Guild.Schema.Repo{full_name: "owner/repo", worker_id: "default", enabled: true})
+
       conn =
         conn
         |> with_auth()
-        |> post(~p"/admin/slack-channels", %{channel_id: "", default_repo: "", notes: ""})
-      assert html_response(conn, 200) =~ "Slack Channels"
+        |> post(~p"/admin/slack-channels", %{
+          "slack_channel" => %{"channel_id" => "C555NOTES", "notes" => "ops triage"},
+          "default_repo" => "owner/repo"
+        })
+
+      assert redirected_to(conn) == ~p"/admin/slack-channels"
+      ch = Guild.Repo.get!(Guild.Schema.SlackChannel, "C555NOTES")
+      assert ch.notes == "ops triage"
+      assert ch.default_repo == "owner/repo"
+      assert ch.enabled == true
+    end
+
+    test "blank channel_id renders single error and persists nothing", %{conn: conn} do
+      conn =
+        conn
+        |> with_auth()
+        |> post(~p"/admin/slack-channels", %{
+          "slack_channel" => %{"channel_id" => "", "notes" => ""},
+          "default_repo" => ""
+        })
+
+      body = html_response(conn, 200)
+      assert body =~ "Slack Channels"
+      # Exactly one "can't be blank" message — regression guard for earlier
+      # impl that added the error twice (validate_required + explicit add_error).
+      assert length(Regex.scan(~r/can&#39;t be blank|can't be blank/, body)) == 1
+      assert Guild.Repo.aggregate(Guild.Schema.SlackChannel, :count) == 0
     end
   end
 

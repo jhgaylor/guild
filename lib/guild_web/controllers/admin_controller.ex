@@ -98,32 +98,34 @@ defmodule GuildWeb.AdminController do
   end
 
   def create_slack_channel(conn, params) do
-    channel_id = String.trim(params["channel_id"] || "")
+    # Form posts nested under "slack_channel" (Phoenix form helper convention).
+    # The "default_repo" select is a raw HTML input, so it lives at the top level.
+    form_attrs = Map.get(params, "slack_channel", %{})
     default_repo = case String.trim(params["default_repo"] || "") do
       "" -> nil
       v  -> v
     end
 
-    if channel_id == "" do
-      channels = Guild.Repo.all(Guild.Schema.SlackChannel)
-      repos = Guild.Repo.all(Guild.Schema.Repo)
-      changeset =
-        Guild.Schema.SlackChannel.changeset(%Guild.Schema.SlackChannel{}, %{channel_id: ""})
-        |> Ecto.Changeset.add_error(:channel_id, "can't be blank")
-        |> Map.put(:action, :insert)
-      conn
-      |> put_status(200)
-      |> render(:slack_channels, channels: channels, repos: repos, changeset: changeset)
-    else
-      attrs = %{
-        channel_id: channel_id,
-        default_repo: default_repo,
-        enabled: true,
-        notes: String.trim(params["notes"] || "")
-      }
-      changeset = Guild.Schema.SlackChannel.changeset(%Guild.Schema.SlackChannel{}, attrs)
-      Guild.Repo.insert(changeset, on_conflict: :nothing, conflict_target: :channel_id)
-      redirect(conn, to: ~p"/admin/slack-channels")
+    attrs =
+      form_attrs
+      |> Map.update("channel_id", "", &String.trim/1)
+      |> Map.update("notes", "", &String.trim/1)
+      |> Map.put("default_repo", default_repo)
+      |> Map.put("enabled", true)
+
+    changeset = Guild.Schema.SlackChannel.changeset(%Guild.Schema.SlackChannel{}, attrs)
+
+    case Guild.Repo.insert(changeset, on_conflict: :nothing, conflict_target: :channel_id) do
+      {:ok, _} ->
+        redirect(conn, to: ~p"/admin/slack-channels")
+
+      {:error, cs} ->
+        channels = Guild.Repo.all(Guild.Schema.SlackChannel)
+        repos = Guild.Repo.all(Guild.Schema.Repo)
+        conn
+        |> put_status(200)
+        |> render(:slack_channels, channels: channels, repos: repos,
+                  changeset: Map.put(cs, :action, :insert))
     end
   end
 
