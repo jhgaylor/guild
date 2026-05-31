@@ -472,5 +472,79 @@ defmodule GuildWeb.SlackControllerTest do
         where: e.event_type == "slack.message" and is_nil(e.thread_id))
       assert event != nil
     end
+
+    # Test F — reaction_added on a reply where Slack omits `thread_ts` from item
+    # (the real-world payload). Strategy (d) recovers the work thread via the
+    # prior slack.message Event that recorded the reply.
+    test "reaction_added stop_sign on reply with no thread_ts resolves via prior slack.message Event", %{conn: conn} do
+      {:ok, thread} =
+        %Thread{}
+        |> Thread.changeset(%{
+          anchor_type: "github_issue",
+          anchor_id: "g9s4-f",
+          state: "pr_open",
+          slack_channel: "C123",
+          slack_thread_ts: "1000.000"
+        })
+        |> Repo.insert()
+
+      reply_ts = "1001.111"
+
+      # Step 1: user replies in the thread — Slack DOES include thread_ts on message events.
+      reply_body = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "message",
+          "channel" => "C123",
+          "ts" => reply_ts,
+          "thread_ts" => "1000.000",
+          "text" => "did this merge cleanly?"
+        }
+      }
+
+      conn1 = slack_events_conn(conn, reply_body)
+      assert conn1.status == 200
+
+      # Sanity: the message Event was associated to the work thread.
+      msg_event =
+        Repo.one(
+          from e in Event,
+            where: e.event_type == "slack.message" and e.thread_id == ^thread.id
+        )
+
+      assert msg_event != nil
+
+      # Step 2: user reacts with :stop_sign: on their own reply. Slack does NOT
+      # include `thread_ts` in `item` for reaction_added payloads — this is the
+      # real-world case Jake hit on the G9 live dry-run.
+      reaction_body = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "reaction_added",
+          "reaction" => "stop_sign",
+          "item" => %{
+            "type" => "message",
+            "channel" => "C123",
+            "ts" => reply_ts
+          }
+        }
+      }
+
+      conn2 = slack_events_conn(conn, reaction_body)
+      assert conn2.status == 200
+
+      # The reaction must hold the work thread via Strategy (d).
+      assert Repo.get!(Thread, thread.id).held == true
+
+      # And the reaction Event row must be associated to the work thread.
+      reaction_event =
+        Repo.one(
+          from e in Event,
+            where: e.event_type == "slack.reaction_added"
+        )
+
+      assert reaction_event != nil
+      assert reaction_event.thread_id == thread.id
+    end
   end
 end

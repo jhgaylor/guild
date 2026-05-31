@@ -172,10 +172,13 @@ defmodule GuildWeb.SlackController do
     end
   end
 
-  # Resolve the work thread for an inbound Slack message using three strategies in order:
+  # Resolve the work thread for an inbound Slack message using four strategies in order:
   # (a) artifact lookup by slack://channel/ts URL
   # (b) thread column lookup where slack_channel + slack_thread_ts == ts
   # (c) thread column lookup where slack_channel + slack_thread_ts == thread_ts_opt (parent ts)
+  # (d) prior slack.message Event lookup by channel+ts — recovers thread for reactions
+  #     on user replies, since Slack does NOT include `thread_ts` in reaction_added
+  #     `item` payloads. We rely on having recorded the replied-to message earlier.
   defp resolve_work_thread(channel, ts, thread_ts_opt) do
     url = "slack://" <> channel <> "/" <> ts
 
@@ -196,17 +199,39 @@ defmodule GuildWeb.SlackController do
 
           nil ->
             # Strategy (c): thread column lookup by thread_ts_opt (parent ts)
-            if thread_ts_opt do
-              case Repo.one(from t in Schema.Thread,
-                     where: t.slack_channel == ^channel and t.slack_thread_ts == ^thread_ts_opt,
-                     limit: 1) do
-                %Schema.Thread{id: thread_id} -> {:ok, thread_id}
-                nil -> :not_found
-              end
-            else
-              :not_found
+            with :no <- strategy_c(channel, thread_ts_opt) do
+              # Strategy (d): prior slack.message Event lookup by channel+ts
+              strategy_d(channel, ts)
             end
         end
+    end
+  end
+
+  defp strategy_c(_channel, nil), do: :no
+
+  defp strategy_c(channel, thread_ts_opt) do
+    case Repo.one(from t in Schema.Thread,
+           where: t.slack_channel == ^channel and t.slack_thread_ts == ^thread_ts_opt,
+           limit: 1) do
+      %Schema.Thread{id: thread_id} -> {:ok, thread_id}
+      nil -> :no
+    end
+  end
+
+  defp strategy_d(channel, ts) do
+    case Repo.one(
+           from e in Schema.Event,
+             where:
+               e.source == "slack" and
+                 e.event_type == "slack.message" and
+                 not is_nil(e.thread_id) and
+                 fragment("?->'event'->>'channel' = ?", e.raw_payload, ^channel) and
+                 fragment("?->'event'->>'ts' = ?", e.raw_payload, ^ts),
+             order_by: [desc: e.occurred_at],
+             limit: 1
+         ) do
+      %Schema.Event{thread_id: tid} when not is_nil(tid) -> {:ok, tid}
+      _ -> :not_found
     end
   end
 
