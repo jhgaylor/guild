@@ -357,6 +357,64 @@ defmodule GuildWeb.SlackControllerTest do
     end
   end
 
+  describe "slack_channels gate" do
+    test "top-level message for unconfigured channel records audit Event but no worker enqueued", %{conn: conn} do
+      event_payload = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "message",
+          "channel" => "CNOTCONFIG",
+          "user" => "U123",
+          "text" => "hello world",
+          "ts" => "1234567890.000001",
+          "event_ts" => "1234567890.000001"
+        }
+      }
+      conn = slack_events_conn(conn, event_payload)
+      assert conn.status == 200
+      # An audit Event row is still recorded (ADR 0016: record all)
+      import Ecto.Query
+      event = Guild.Repo.one(from e in Guild.Schema.Event,
+        where: e.event_type == "slack.message",
+        limit: 1)
+      assert event != nil
+    end
+
+    test "top-level message for enabled channel passes gate (returns 200)", %{conn: conn} do
+      {:ok, _} = Guild.Repo.insert(%Guild.Schema.SlackChannel{channel_id: "CENABLED", enabled: true})
+      event_payload = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "message",
+          "channel" => "CENABLED",
+          "user" => "U123",
+          "text" => "please fix the bug",
+          "ts" => "1234567890.000002",
+          "event_ts" => "1234567890.000002"
+        }
+      }
+      conn = slack_events_conn(conn, event_payload)
+      assert conn.status == 200
+    end
+
+    test "top-level message for disabled channel records audit Event only", %{conn: conn} do
+      {:ok, _} = Guild.Repo.insert(%Guild.Schema.SlackChannel{channel_id: "CDISABLED", enabled: false})
+      event_payload = %{
+        "type" => "event_callback",
+        "event" => %{
+          "type" => "message",
+          "channel" => "CDISABLED",
+          "user" => "U123",
+          "text" => "another message",
+          "ts" => "1234567890.000003",
+          "event_ts" => "1234567890.000003"
+        }
+      }
+      conn = slack_events_conn(conn, event_payload)
+      assert conn.status == 200
+    end
+  end
+
   describe "events endpoint — resolve_work_thread strategies" do
     # Test B — reaction_added via thread column lookup (no artifact)
     test "reaction_added stop_sign sets held via thread column when no artifact", %{conn: conn} do

@@ -90,6 +90,56 @@ defmodule GuildWeb.AdminController do
     end
   end
 
+  def slack_channels(conn, _params) do
+    channels = Guild.Repo.all(Guild.Schema.SlackChannel)
+    repos = Guild.Repo.all(Guild.Schema.Repo)
+    changeset = Ecto.Changeset.change(%Guild.Schema.SlackChannel{})
+    render(conn, :slack_channels, channels: channels, repos: repos, changeset: changeset)
+  end
+
+  def create_slack_channel(conn, params) do
+    channel_id = String.trim(params["channel_id"] || "")
+    default_repo = case String.trim(params["default_repo"] || "") do
+      "" -> nil
+      v  -> v
+    end
+
+    if channel_id == "" do
+      channels = Guild.Repo.all(Guild.Schema.SlackChannel)
+      repos = Guild.Repo.all(Guild.Schema.Repo)
+      changeset =
+        Guild.Schema.SlackChannel.changeset(%Guild.Schema.SlackChannel{}, %{channel_id: ""})
+        |> Ecto.Changeset.add_error(:channel_id, "can't be blank")
+        |> Map.put(:action, :insert)
+      conn
+      |> put_status(200)
+      |> render(:slack_channels, channels: channels, repos: repos, changeset: changeset)
+    else
+      attrs = %{
+        channel_id: channel_id,
+        default_repo: default_repo,
+        enabled: true,
+        notes: String.trim(params["notes"] || "")
+      }
+      changeset = Guild.Schema.SlackChannel.changeset(%Guild.Schema.SlackChannel{}, attrs)
+      Guild.Repo.insert(changeset, on_conflict: :nothing, conflict_target: :channel_id)
+      redirect(conn, to: ~p"/admin/slack-channels")
+    end
+  end
+
+  def toggle_slack_channel(conn, %{"channel_id" => channel_id}) do
+    channel = Guild.Repo.get!(Guild.Schema.SlackChannel, channel_id)
+    changeset = Ecto.Changeset.change(channel, enabled: !channel.enabled)
+    Guild.Repo.update!(changeset)
+    redirect(conn, to: ~p"/admin/slack-channels")
+  end
+
+  def delete_slack_channel(conn, %{"channel_id" => channel_id}) do
+    channel = Guild.Repo.get!(Guild.Schema.SlackChannel, channel_id)
+    Guild.Repo.delete!(channel)
+    redirect(conn, to: ~p"/admin/slack-channels")
+  end
+
   def integrations(conn, _params) do
     github = github_status()
     slack = slack_status()

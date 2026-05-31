@@ -77,6 +77,10 @@ defmodule GuildWeb.Router do
       get "/workers", AdminController, :workers
       post "/workers", AdminController, :create_worker
       get "/integrations", AdminController, :integrations
+      get "/slack-channels", AdminController, :slack_channels
+      post "/slack-channels", AdminController, :create_slack_channel
+      patch "/slack-channels/:channel_id/toggle", AdminController, :toggle_slack_channel
+      delete "/slack-channels/:channel_id", AdminController, :delete_slack_channel
     end
   end
 
