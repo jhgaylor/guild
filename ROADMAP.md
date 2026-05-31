@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g10-framing review** — framing doc at [`plan/g10-framing/framing.md`](plan/g10-framing/framing.md) awaiting driver approval; once approved, dispatch captain-picard to decompose into a slice plan.
+- **g10-slice-plan** — PR open for driver review. [`plan/g10/slice-plan.md`](plan/g10/slice-plan.md) decomposes G10 into 5 slices: (1) `slack_channels` table + `/admin/slack-channels` CRUD + Events gate; (2) `Guild.LLM.OpenRouter` + `Guild.SlackInbox.classify/1` + `SlackInboxWorker` Oban job + `slack_inbox_events` table + dry-run default; (3) new-work (→ GitHub issue + Slack confirmation) + reference (→ Event on thread + Slack reply) actions; (4) `/admin/slack-inbox` operator review + overrides; (5) driver dry-run + live-fire + targeted fixes (judgment-gated close). ADR 0017 proposed: OpenRouter for stateless one-shot classification, `openai/gpt-4o-mini` default, Fountain reserved for stateful multi-turn work. Awaiting driver approval before any slice dispatches.
 
 ## Done
 
