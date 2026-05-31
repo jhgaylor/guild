@@ -8,7 +8,7 @@ The captain-picard orchestrator reads this every cycle and writes the conversati
 
 ## Now
 
-- **g9-slice-3** — in flight (Guild-side engineering only). `docs/slack-setup.md` operator runbook + `Guild.Release.slack_ping/0` sanity-check via `bin/guild eval`. Operator-completed steps (Jake provisions Slack App + secrets + invites bot) follow merge + deploy. Branch: `g9/slice-3-slack-setup`. _(Slice 2 PR #60 merged; CI building → deploy.)_
+- **g9-slice-3** — in progress on branch `g9/slice-3-slack-setup`. Brief at `plan/g9-slice-3/general-purpose-engineer-brief.md`. Delivering: `docs/slack-setup.md` (8-step operator runbook: Slack App creation → scopes → Events API → install → channel invite → k8s Secret → rollout → verify) + `Guild.Release.slack_ping/0` sanity-check callable via `bin/guild eval` + one reference line in `docs/setup.md` + two Bypass-backed tests. **Operator-gated:** Jake runs the install steps (Steps 1–7 of slack-setup.md) after merge + deploy; `slack_ping` is the post-deploy verification tool. _(Slice 2 PR #60 merged; CI building → deploy.)_
 
 ## Done
 
