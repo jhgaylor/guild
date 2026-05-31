@@ -1,0 +1,72 @@
+<div class="container">
+  <h1 class="page-title">Slack Inbox</h1>
+  <p class="page-subtitle"><a href={~p"/admin"}>← Admin</a></p>
+
+  <%= if Enum.empty?(@events) do %>
+    <p class="empty-state">No Slack inbox events yet. Enable a channel in <a href={~p"/admin/slack-channels"}>Slack Channels</a> and set <code>SLACK_INBOX_DRY_RUN=false</code> (or leave dry-run on to preview classifications here).</p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Channel</th>
+          <th>User</th>
+          <th>Message</th>
+          <th>Verdict</th>
+          <th>Confidence</th>
+          <th>Action</th>
+          <th>Reasoning</th>
+          <th>Override</th>
+        </tr>
+      </thead>
+      <tbody>
+        <%= for event <- @events do %>
+          <tr>
+            <td style="white-space:nowrap"><%= Calendar.strftime(event.inserted_at, "%m-%d %H:%M") %></td>
+            <td><code><%= event.channel_id %></code></td>
+            <td><%= event.user_display_name || event.user_id %></td>
+            <td title={event.message_text}>
+              <%= String.slice(event.message_text || "", 0, 80) %><%= if String.length(event.message_text || "") > 80, do: "…" %>
+            </td>
+            <td>
+              <span class={"badge #{verdict_badge_class(event.verdict)}"}>
+                <%= event.verdict || "—" %>
+              </span>
+            </td>
+            <td>
+              <%= if event.confidence, do: "#{round(event.confidence * 100)}%", else: "—" %>
+            </td>
+            <td>
+              <span class={"badge #{action_badge_class(event.action_taken)}"}>
+                <%= event.action_taken || "—" %>
+              </span>
+              <%= if event.github_issue_url do %>
+                <br /><a href={event.github_issue_url} target="_blank" rel="noopener">issue ↗</a>
+              <% end %>
+            </td>
+            <td style="max-width:300px;font-size:0.85em">
+              <%= event.override_verdict && "[override: #{event.override_verdict}] " %>
+              <%= event.reasoning %>
+            </td>
+            <td>
+              <%= if is_nil(event.override_verdict) do %>
+                <form method="post" action={~p"/admin/slack-inbox/#{event.id}/reclassify"} style="display:inline">
+                  <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+                  <input type="hidden" name="verdict" value="new_work" />
+                  <button type="submit" class="btn btn--small">File as new work</button>
+                </form>
+                <form method="post" action={~p"/admin/slack-inbox/#{event.id}/reclassify"} style="display:inline;margin-left:4px">
+                  <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+                  <input type="hidden" name="verdict" value="noise" />
+                  <button type="submit" class="btn btn--small">Mark noise</button>
+                </form>
+              <% else %>
+                <span style="color:#888">overridden</span>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

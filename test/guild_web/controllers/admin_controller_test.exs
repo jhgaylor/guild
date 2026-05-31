@@ -275,6 +275,110 @@ defmodule GuildWeb.AdminControllerTest do
   end
 
   # ---------------------------------------------------------------------------
+  # /admin/slack-inbox tests
+  # ---------------------------------------------------------------------------
+
+  describe "GET /admin/slack-inbox" do
+    test "without auth returns 401", %{conn: conn} do
+      conn = get(conn, ~p"/admin/slack-inbox")
+      assert conn.status == 401
+    end
+
+    test "with auth returns 200", %{conn: conn} do
+      conn = conn |> with_auth() |> get(~p"/admin/slack-inbox")
+      assert html_response(conn, 200) =~ "Slack Inbox"
+    end
+
+    test "lists existing inbox events", %{conn: conn} do
+      {:ok, _} = Guild.Repo.insert(
+        Guild.Schema.SlackInboxEvent.changeset(%Guild.Schema.SlackInboxEvent{}, %{
+          event_id: "evt_admin_test",
+          channel_id: "C_ADMIN",
+          user_id: "U_ADMIN",
+          message_ts: "111.222",
+          message_text: "fix the login bug please",
+          verdict: "new_work",
+          confidence: 0.92,
+          reasoning: "direct task request",
+          action_taken: "dry_run"
+        })
+      )
+      conn = conn |> with_auth() |> get(~p"/admin/slack-inbox")
+      body = html_response(conn, 200)
+      assert body =~ "C_ADMIN"
+      assert body =~ "fix the login bug"
+    end
+  end
+
+  describe "POST /admin/slack-inbox/:id/reclassify — mark noise" do
+    test "sets override_verdict to noise and redirects", %{conn: conn} do
+      {:ok, event} = Guild.Repo.insert(
+        Guild.Schema.SlackInboxEvent.changeset(%Guild.Schema.SlackInboxEvent{}, %{
+          event_id: "evt_reclassify_noise",
+          channel_id: "C_RECLASSIFY",
+          user_id: "U123",
+          message_ts: "111.333",
+          message_text: "good morning everyone",
+          verdict: "new_work",
+          confidence: 0.75,
+          reasoning: "seemed like a task",
+          action_taken: "dry_run"
+        })
+      )
+
+      conn =
+        conn
+        |> with_auth()
+        |> post(~p"/admin/slack-inbox/#{event.id}/reclassify", %{"verdict" => "noise"})
+
+      assert redirected_to(conn) == ~p"/admin/slack-inbox"
+
+      updated = Guild.Repo.get!(Guild.Schema.SlackInboxEvent, event.id)
+      assert updated.override_verdict == "noise"
+    end
+  end
+
+  describe "POST /admin/slack-inbox/:id/reclassify — file as new work" do
+    test "creates GitHub issue and sets override_verdict to new_work", %{conn: conn} do
+      {:ok, _channel} = Guild.Repo.insert(
+        Guild.Schema.SlackChannel.changeset(%Guild.Schema.SlackChannel{}, %{
+          channel_id: "C_NW",
+          default_repo: "owner/repo",
+          enabled: true
+        })
+      )
+
+      {:ok, event} = Guild.Repo.insert(
+        Guild.Schema.SlackInboxEvent.changeset(%Guild.Schema.SlackInboxEvent{}, %{
+          event_id: "evt_reclassify_nw",
+          channel_id: "C_NW",
+          user_id: "U_NW",
+          message_ts: "111.444",
+          message_text: "fix the payment bug",
+          verdict: "noise",
+          confidence: 0.4,
+          reasoning: "misclassified",
+          action_taken: "dry_run"
+        })
+      )
+
+      Guild.GitHub.TestAdapter.configure(:create_issue, {:ok, %{"html_url" => "https://github.com/owner/repo/issues/42"}})
+
+      conn =
+        conn
+        |> with_auth()
+        |> post(~p"/admin/slack-inbox/#{event.id}/reclassify", %{"verdict" => "new_work"})
+
+      assert redirected_to(conn) == ~p"/admin/slack-inbox"
+
+      updated = Guild.Repo.get!(Guild.Schema.SlackInboxEvent, event.id)
+      assert updated.override_verdict == "new_work"
+      assert updated.action_taken == "issue_created"
+      assert updated.github_issue_url == "https://github.com/owner/repo/issues/42"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # /admin/repos tests
   # ---------------------------------------------------------------------------
 

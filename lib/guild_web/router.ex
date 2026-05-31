@@ -81,6 +81,8 @@ defmodule GuildWeb.Router do
       post "/slack-channels", AdminController, :create_slack_channel
       patch "/slack-channels/:channel_id/toggle", AdminController, :toggle_slack_channel
       delete "/slack-channels/:channel_id", AdminController, :delete_slack_channel
+      get "/slack-inbox", AdminController, :slack_inbox
+      post "/slack-inbox/:id/reclassify", AdminController, :reclassify_inbox_event
     end
   end
 
