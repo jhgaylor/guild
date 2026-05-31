@@ -59,13 +59,22 @@ item 1.
 Issue: the core capability. Given a top-level Slack message, decide
 `:new_work | :refers_to_existing | :noise`, with a confidence score and
 LLM reasoning. Implementation: a `Guild.Workers.SlackInboxWorker` Oban
-job (own queue, args-unique by event id) spawns a short-lived Fountain
-conv with a tight classifier prompt. The webhook handler enqueues the
-job and returns 200 immediately — the classifier runs async (5–15s
-latency is acceptable; this is "colleague responds when they get to
-it"). Cheap prefilter before enqueuing: skip bot messages, messages
-< 10 chars, messages from the bot's own user id. **Priority: highest**
-— the rest of G10 is plumbing around this.
+job (own queue, args-unique by event id) makes a **direct OpenRouter
+API call** (new module `Guild.LLM.OpenRouter`) with a tight classifier
+prompt and structured JSON output. Fountain is intentionally NOT used
+here — classification is stateless one-shot work, and spawning a full
+conv (agent boot, vault load, conv lifecycle, Pass D termination) is
+heavy for a sub-second LLM call. OpenRouter gives us model selection
+(cheap model for classification, room to upgrade) without committing
+to a single provider. New env vars: `OPENROUTER_API_KEY` (required to
+enable the inbox) + `OPENROUTER_CLASSIFIER_MODEL` (default to a cheap
+fast model — captain-picard's slice plan picks the exact one). The
+webhook handler enqueues the Oban job and returns 200 immediately —
+the classifier runs async (1–3s latency typical for a small model;
+this is "colleague responds when they get to it"). Cheap prefilter
+before enqueuing: skip bot messages, messages < 10 chars, messages
+from the bot's own user id. **Priority: highest** — the rest of G10
+is plumbing around this.
 
 ### 4. Reference resolution against open work threads *(the colleague's memory)*
 Issue: when classifier says `:refers_to_existing`, it must also identify
@@ -201,13 +210,18 @@ session, observes:
 - **Confidence threshold.** What confidence above which we act, below
   which we record-only? Sensible default: 0.7. Tunable per-channel?
   For G10 start with one global default.
-- **Fountain conv per classification — wasteful?** Each classification
-  spawns + terminates a short-lived conv. Cost is bounded (cheap model,
-  short context) but architecturally heavy. Should we instead use a
-  direct LLM API call from inside `SlackInboxWorker`? Trade-off:
-  consistency (everything goes through Fountain) vs latency/cost. For
-  G10 propose Fountain to keep architecture uniform; revisit if it
-  becomes the dominant cost driver.
+- **OpenRouter, not Fountain, for the classifier.** *Driver decision
+  recorded at framing time.* Fountain is for stateful agent work
+  (multi-turn, tools, vault, conv lifecycle). Classification is
+  one-shot stateless work — spawning a Fountain conv per Slack message
+  would be architecturally heavy and slower than the actual LLM call.
+  Use `Guild.LLM.OpenRouter` direct (new module). This introduces
+  OpenRouter as a runtime dependency for the inbox feature — captain-
+  picard's slice plan should propose ADR 0017 covering: model choice
+  (cheap fast classifier model + escape hatch via env), failure modes
+  (OpenRouter down → record Event, skip action), and the line between
+  "use Fountain" (anything that needs context, tools, or multi-turn)
+  vs "use OpenRouter direct" (anything stateless + sub-second).
 - **Multi-channel outbound.** G9 outbound used `SLACK_CHANNEL_ID` env.
   For G10's `:new_work` confirmation reply and `:refers_to_existing`
   reply, we need to post in the *originating* channel, not the env
@@ -232,11 +246,14 @@ session, observes:
   ongoing work [X]" but the asker wasn't talking about X. Mitigation:
   confidence threshold; below threshold record-only; reply text is
   hedged ("looks like" not "this is").
-- **LLM cost.** ~$0.01–0.05 per classification on a cheap model; at
-  100 msgs/day with prefilter dropping half, ~$15–75/mo per active
-  channel. Acceptable for a single-team instance, less so for a
-  busy multi-channel deployment. Captain-picard's slice plan should
-  call this out + propose a cost-cap mechanism if needed.
+- **LLM cost.** Direct OpenRouter call on a cheap classifier model
+  should land in ~$0.001–0.01 per classification (cheaper than the
+  Fountain-conv estimate since there's no agent overhead). At
+  100 msgs/day with prefilter dropping half, ~$1.50–15/mo per active
+  channel. Acceptable for a single-team instance and tolerable for
+  multi-channel. Captain-picard's slice plan should call this out +
+  propose a cost-cap mechanism if needed (e.g. per-day spend ceiling
+  that flips the feature into dry-run).
 - **Trust event.** This is the biggest step toward Guild being
   perceived as autonomous. Item 8 (dry-run) is mandatory; the driver
   walks dry-run before flipping the flag.
