@@ -203,6 +203,72 @@ defmodule GuildWeb.AdminControllerTest do
   end
 
   # ---------------------------------------------------------------------------
+  # /admin/slack-channels tests
+  # ---------------------------------------------------------------------------
+
+  describe "GET /admin/slack-channels" do
+    test "without auth returns 401", %{conn: conn} do
+      conn = get(conn, ~p"/admin/slack-channels")
+      assert conn.status == 401
+    end
+
+    test "with auth returns 200", %{conn: conn} do
+      conn = conn |> with_auth() |> get(~p"/admin/slack-channels")
+      assert html_response(conn, 200) =~ "Slack Channels"
+    end
+
+    test "lists existing channels", %{conn: conn} do
+      {:ok, _} = Guild.Repo.insert(%Guild.Schema.SlackChannel{channel_id: "C111TEST"})
+      conn = conn |> with_auth() |> get(~p"/admin/slack-channels")
+      assert html_response(conn, 200) =~ "C111TEST"
+    end
+  end
+
+  describe "POST /admin/slack-channels" do
+    test "creates a channel and redirects", %{conn: conn} do
+      conn =
+        conn
+        |> with_auth()
+        |> post(~p"/admin/slack-channels", %{channel_id: "C222TEST", default_repo: "", notes: ""})
+      assert redirected_to(conn) == ~p"/admin/slack-channels"
+      assert Guild.Repo.get(Guild.Schema.SlackChannel, "C222TEST") != nil
+    end
+
+    test "blank channel_id returns 200 with error", %{conn: conn} do
+      conn =
+        conn
+        |> with_auth()
+        |> post(~p"/admin/slack-channels", %{channel_id: "", default_repo: "", notes: ""})
+      assert html_response(conn, 200) =~ "Slack Channels"
+    end
+  end
+
+  describe "PATCH /admin/slack-channels/:channel_id/toggle" do
+    test "toggles enabled flag", %{conn: conn} do
+      {:ok, ch} = Guild.Repo.insert(%Guild.Schema.SlackChannel{channel_id: "C333TEST", enabled: true})
+      conn =
+        conn
+        |> with_auth()
+        |> patch(~p"/admin/slack-channels/#{ch.channel_id}/toggle")
+      assert redirected_to(conn) == ~p"/admin/slack-channels"
+      updated = Guild.Repo.get!(Guild.Schema.SlackChannel, "C333TEST")
+      assert updated.enabled == false
+    end
+  end
+
+  describe "DELETE /admin/slack-channels/:channel_id" do
+    test "removes the channel", %{conn: conn} do
+      {:ok, ch} = Guild.Repo.insert(%Guild.Schema.SlackChannel{channel_id: "C444TEST"})
+      conn =
+        conn
+        |> with_auth()
+        |> delete(~p"/admin/slack-channels/#{ch.channel_id}")
+      assert redirected_to(conn) == ~p"/admin/slack-channels"
+      assert Guild.Repo.get(Guild.Schema.SlackChannel, "C444TEST") == nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # /admin/repos tests
   # ---------------------------------------------------------------------------
 

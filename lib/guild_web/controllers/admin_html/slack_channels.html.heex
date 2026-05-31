@@ -1,0 +1,64 @@
+<div class="container">
+  <h1 class="page-title">Slack Channels</h1>
+  <p class="page-subtitle"><a href={~p"/admin"}>← Admin</a></p>
+
+  <%= if Enum.empty?(@channels) do %>
+    <p class="empty-state">No Slack channels configured yet.</p>
+  <% else %>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Channel ID</th>
+          <th>Status</th>
+          <th>Default Repo</th>
+          <th>Notes</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <%= for ch <- @channels do %>
+          <tr>
+            <td><code><%= ch.channel_id %></code></td>
+            <td>
+              <%= if ch.enabled do %>
+                <span class="badge badge--green">enabled</span>
+              <% else %>
+                <span class="badge badge--red">disabled</span>
+              <% end %>
+            </td>
+            <td><%= ch.default_repo || "—" %></td>
+            <td><%= ch.notes || "—" %></td>
+            <td>
+              <form method="post" action={~p"/admin/slack-channels/#{ch.channel_id}/toggle"} style="display:inline">
+                <input type="hidden" name="_method" value="patch" />
+                <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+                <button type="submit"><%= if ch.enabled, do: "Disable", else: "Enable" %></button>
+              </form>
+              <form method="post" action={~p"/admin/slack-channels/#{ch.channel_id}"} style="display:inline">
+                <input type="hidden" name="_method" value="delete" />
+                <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+                <button type="submit">Delete</button>
+              </form>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+
+  <h2>Add Channel</h2>
+  <.form :let={f} for={@changeset} action={~p"/admin/slack-channels"} method="post">
+    <.input field={f[:channel_id]} label="Channel ID (e.g. C012AB3CD)" required />
+    <div>
+      <label for="default_repo">Default Repo (optional)</label>
+      <select name="default_repo" id="default_repo">
+        <option value="">— none —</option>
+        <%= for repo <- @repos do %>
+          <option value={repo.full_name}><%= repo.full_name %></option>
+        <% end %>
+      </select>
+    </div>
+    <.input field={f[:notes]} label="Notes (optional)" />
+    <button type="submit">Add Channel</button>
+  </.form>
+</div>

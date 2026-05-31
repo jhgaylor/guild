@@ -125,23 +125,38 @@ defmodule GuildWeb.SlackController do
     # ADR 0016: every verified Slack event is recorded, including state-driving ones.
     record_slack_event(event_type, params, thread_id)
 
+    # Slice 1 gate: top-level messages only flow through if channel is enabled.
+    # Slice 2 will enqueue SlackInboxWorker in the :ok branch.
+    should_process =
+      case event do
+        %{"type" => "message", "channel" => ch_id} when not is_map_key(event, "thread_ts") ->
+          case Guild.Repo.get(Guild.Schema.SlackChannel, ch_id) do
+            %Guild.Schema.SlackChannel{enabled: true} -> true
+            _ -> false
+          end
+        _ ->
+          true
+      end
+
     # Then optionally drive state.
-    case event do
-      %{"type" => "reaction_added", "reaction" => "stop_sign", "item" => %{"type" => "message"}} ->
-        case thread_id do
-          nil ->
-            Logger.debug("SlackController.events: reaction_added stop_sign on non-Guild message, no-op")
-            :ok
+    if should_process do
+      case event do
+        %{"type" => "reaction_added", "reaction" => "stop_sign", "item" => %{"type" => "message"}} ->
+          case thread_id do
+            nil ->
+              Logger.debug("SlackController.events: reaction_added stop_sign on non-Guild message, no-op")
+              :ok
 
-          tid ->
-            case Guild.Control.hold(tid) do
-              {:ok, _} -> :ok
-              {:error, reason} -> Logger.warning("SlackController.events: hold error: #{inspect(reason)}")
-            end
-        end
+            tid ->
+              case Guild.Control.hold(tid) do
+                {:ok, _} -> :ok
+                {:error, reason} -> Logger.warning("SlackController.events: hold error: #{inspect(reason)}")
+              end
+          end
 
-      _ ->
-        :ok
+        _ ->
+          :ok
+      end
     end
 
     send_resp(conn, 200, "")
