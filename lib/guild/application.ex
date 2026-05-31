@@ -20,6 +20,12 @@ defmodule Guild.Application do
       GuildWeb.Endpoint
     ]
 
+    bot_user_id = Application.get_env(:guild, :slack_bot_user_id)
+    if is_nil(bot_user_id) or bot_user_id == "" do
+      require Logger
+      Logger.warning("SLACK_BOT_USER_ID not set — self-loop guard degrades to subtype-only (ADR 0017)")
+    end
+
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Guild.Supervisor]

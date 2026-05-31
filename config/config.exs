@@ -34,7 +34,7 @@ config :phoenix, :json_library, Jason
 
 config :guild, Oban,
   repo: Guild.Repo,
-  queues: [claims: 10],
+  queues: [claims: 10, slack_inbox: 5],
   plugins: [
     {Oban.Plugins.Cron,
      crontab: [

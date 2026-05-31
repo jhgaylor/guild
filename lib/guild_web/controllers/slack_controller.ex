@@ -141,12 +141,32 @@ defmodule GuildWeb.SlackController do
     # Then optionally drive state.
     if should_process do
       case event do
+        %{"type" => "message", "channel" => ch_id, "user" => uid, "ts" => ts}
+        when not is_map_key(event, "thread_ts") ->
+          subtype = Map.get(event, "subtype")
+          if subtype != "bot_message" do
+            job_args = %{
+              event_id: Map.get(event, "event_id") || Map.get(params, "event_id") || "#{ch_id}:#{ts}",
+              channel_id: ch_id,
+              user_id: uid,
+              user_display_name: Map.get(event, "user_profile", %{}) |> Map.get("display_name") ||
+                                 Map.get(event, "username") || uid,
+              message_ts: ts,
+              message_text: String.slice(Map.get(event, "text", ""), 0, 2000)
+            }
+
+            case Guild.Workers.SlackInboxWorker.new(job_args) |> Oban.insert() do
+              {:ok, _job} -> :ok
+              {:error, reason} ->
+                Logger.warning("SlackController: failed to enqueue SlackInboxWorker: #{inspect(reason)}")
+            end
+          end
+
         %{"type" => "reaction_added", "reaction" => "stop_sign", "item" => %{"type" => "message"}} ->
           case thread_id do
             nil ->
               Logger.debug("SlackController.events: reaction_added stop_sign on non-Guild message, no-op")
               :ok
-
             tid ->
               case Guild.Control.hold(tid) do
                 {:ok, _} -> :ok
