@@ -71,7 +71,7 @@ defmodule Guild.SlackInbox do
   end
 
   defp parse_classification(text) do
-    case Jason.decode(String.trim(text)) do
+    case Jason.decode(extract_json(text)) do
       {:ok, %{"verdict" => verdict, "confidence" => confidence, "reasoning" => reasoning} = decoded}
       when verdict in ["new_work", "refers_to_existing", "noise"] and is_float(confidence) ->
         thread_id = Map.get(decoded, "matched_thread_id")
@@ -93,6 +93,34 @@ defmodule Guild.SlackInbox do
         {:ok, %{verdict: "noise", confidence: 0.0,
                 reasoning: "Non-JSON classifier response: #{String.slice(text, 0, 200)}",
                 thread_id: nil}}
+    end
+  end
+
+  # Extract a JSON object from a model response, tolerating:
+  # - bare JSON (preferred)
+  # - markdown code fences (```json ... ``` or ``` ... ```)
+  # - leading/trailing prose around a single {...} block
+  # Returns the candidate string for Jason.decode/1.
+  defp extract_json(text) do
+    trimmed = String.trim(text)
+
+    cond do
+      # ```json\n{...}\n``` or ```\n{...}\n```
+      Regex.run(~r/```(?:json)?\s*\n?(.*?)\n?\s*```/s, trimmed, capture: :all_but_first) ->
+        [inner] = Regex.run(~r/```(?:json)?\s*\n?(.*?)\n?\s*```/s, trimmed, capture: :all_but_first)
+        String.trim(inner)
+
+      # Already starts with { — assume bare JSON
+      String.starts_with?(trimmed, "{") ->
+        trimmed
+
+      # Prose with an embedded {...} object — take the first balanced-ish block
+      match = Regex.run(~r/\{.*\}/s, trimmed) ->
+        [obj] = match
+        obj
+
+      true ->
+        trimmed
     end
   end
 end

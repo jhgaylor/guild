@@ -48,4 +48,31 @@ defmodule Guild.SlackInboxTest do
     end)
     assert {:ok, %{verdict: "noise", confidence: 0.0}} = Guild.SlackInbox.classify(input())
   end
+
+  test "tolerates ```json markdown code fences (Gemini Flash behavior)", %{bypass: bypass} do
+    Bypass.expect_once(bypass, "POST", "/v1/chat/completions", fn conn ->
+      fenced = "```json\n{\"verdict\":\"noise\",\"confidence\":0.9,\"reasoning\":\"casual chat\",\"matched_thread_id\":null}\n```"
+      body = Jason.encode!(%{choices: [%{message: %{content: fenced}}]})
+      Plug.Conn.resp(conn, 200, body)
+    end)
+    assert {:ok, %{verdict: "noise", confidence: 0.9}} = Guild.SlackInbox.classify(input())
+  end
+
+  test "tolerates plain ``` fences without 'json' tag", %{bypass: bypass} do
+    Bypass.expect_once(bypass, "POST", "/v1/chat/completions", fn conn ->
+      fenced = "```\n{\"verdict\":\"new_work\",\"confidence\":0.85,\"reasoning\":\"r\",\"matched_thread_id\":null}\n```"
+      body = Jason.encode!(%{choices: [%{message: %{content: fenced}}]})
+      Plug.Conn.resp(conn, 200, body)
+    end)
+    assert {:ok, %{verdict: "new_work", confidence: 0.85}} = Guild.SlackInbox.classify(input())
+  end
+
+  test "tolerates leading prose before the JSON object", %{bypass: bypass} do
+    Bypass.expect_once(bypass, "POST", "/v1/chat/completions", fn conn ->
+      prosed = "Sure! Here's the classification:\n{\"verdict\":\"noise\",\"confidence\":0.7,\"reasoning\":\"x\",\"matched_thread_id\":null}"
+      body = Jason.encode!(%{choices: [%{message: %{content: prosed}}]})
+      Plug.Conn.resp(conn, 200, body)
+    end)
+    assert {:ok, %{verdict: "noise", confidence: 0.7}} = Guild.SlackInbox.classify(input())
+  end
 end
